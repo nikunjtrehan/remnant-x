@@ -16,6 +16,7 @@ vi.mock("./api", () => ({
 }));
 beforeEach(() => {
   vi.resetAllMocks();
+  localStorage.clear();
   vi.mocked(api.health).mockResolvedValue({
     status: "ok",
     providers: {
@@ -31,6 +32,32 @@ beforeEach(() => {
   );
 });
 describe("example and live separation", () => {
+  it("restores the live scanner view and batch tab without starting inference", async () => {
+    const first = render(<App />);
+    await screen.findByText("Software verified");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Live workspace" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Scan a remnant" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Batch photos / ZIP" }),
+    );
+    first.unmount();
+    render(<App />);
+    expect(
+      screen
+        .getByRole("button", { name: "Live workspace" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("button", { name: "Batch photos / ZIP" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(api.index).not.toHaveBeenCalled();
+  });
   it("opens the actual recorded example without inference and preserves a live draft across mode switches", async () => {
     render(<App />);
     await screen.findByText("Software verified");

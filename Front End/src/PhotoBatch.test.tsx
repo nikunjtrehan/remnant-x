@@ -6,7 +6,14 @@ import { api } from "./api";
 import raw from "../public/example/recording.json";
 import type { IndexResult, Preflight } from "./types";
 vi.mock("./api", () => ({
-  api: { preflight: vi.fn(), index: vi.fn(), inventory: vi.fn() },
+  api: {
+    preflight: vi.fn(),
+    index: vi.fn(),
+    inventory: vi.fn(),
+    acceptReview: vi.fn(),
+    rejectReview: vi.fn(),
+    review: vi.fn(),
+  },
   downloadText: vi.fn(),
   downloadDxf: vi.fn(),
 }));
@@ -59,6 +66,107 @@ async function importTwo() {
   );
 }
 describe("photo-batch workflow", () => {
+  it("keeps material edits bound to the remaining photo after removing the selected photo", async () => {
+    render(<PhotoBatch onSaved={() => {}} />);
+    await importTwo();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Remove photo 1 from queue" }),
+    );
+    await screen.findByText("Ready for analysis");
+    await userEvent.clear(screen.getByLabelText("Material / exact grade"));
+    await userEvent.type(
+      screen.getByLabelText("Material / exact grade"),
+      "ss316",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+    );
+    await waitFor(() => expect(api.index).toHaveBeenCalledTimes(1));
+    expect(api.index).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      expect.objectContaining({ material: "ss316" }),
+    );
+  });
+  it("holds analyzed sheets for approval and creates a new review ID only after rejected geometry is explicitly retried", async () => {
+    const drafts: IndexResult[] = [];
+    vi.mocked(api.index).mockImplementation(
+      async (_image, _station, fields) => {
+        const draft: IndexResult = {
+          ...indexed,
+          saved_remnant: null,
+          review_id: fields.review_id,
+          review_status: "pending",
+          review_fields: {
+            sheet_id: fields.sheet_id,
+            material: fields.material,
+            thickness_mm: fields.thickness_mm,
+            location: fields.location,
+          },
+        };
+        drafts.push(draft);
+        return draft;
+      },
+    );
+    vi.mocked(api.acceptReview).mockImplementation(async (id) => {
+      const draft = drafts.find((d) => d.review_id === id)!;
+      return {
+        ...draft,
+        review_status: "accepted",
+        saved_remnant: {
+          ...indexed.saved_remnant!,
+          sheet_id: draft.review_fields!.sheet_id,
+        },
+      };
+    });
+    const saved = vi.fn();
+    render(<PhotoBatch onSaved={saved} />);
+    await importTwo();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+    );
+    await screen.findByText(
+      "0 added · 0 ready · 0 need attention · 2 awaiting review",
+    );
+    expect(saved).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Check pending photos" }),
+    );
+    expect(api.index).toHaveBeenCalledTimes(2);
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: /The full outline and all holes match/,
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Accept geometry & add stock" }),
+    );
+    await screen.findByText(
+      "1 added · 0 ready · 0 need attention · 1 awaiting review",
+    );
+    expect(saved).toHaveBeenCalledTimes(1);
+    const oldId = drafts[1].review_id;
+    vi.mocked(api.review).mockResolvedValue({
+      ...drafts[1],
+      review_status: "rejected",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Recover analyses" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(/1 awaiting review/)).toBeNull(),
+    );
+    expect(api.index).toHaveBeenCalledTimes(2);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Check pending photos" }),
+    );
+    await screen.findByRole("button", { name: "Analyze 1 ready photo" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+    );
+    await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(api.index).mock.calls[2][2].review_id).not.toBe(oldId);
+  });
   it("blocks an existing inventory ID before calling SAM", async () => {
     render(<PhotoBatch onSaved={() => {}} />);
     await importTwo();

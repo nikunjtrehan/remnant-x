@@ -19,6 +19,7 @@ export interface Remnant {
   hole_count: number;
   geometry: Geometry;
   dxf_path: string;
+  location?: string;
 }
 export interface Part {
   part_id: string;
@@ -77,6 +78,10 @@ export interface Program {
   };
 }
 export interface PipelineResult {
+  stale_inventory?: string[];
+  plan_id?: string;
+  operator_confirmed_at?: string;
+  stock_update_basis?: string;
   status: string;
   machine_profile: string;
   timings_ms: Record<string, number>;
@@ -137,6 +142,16 @@ export interface Preflight {
   };
 }
 export interface IndexResult {
+  review_id?: string;
+  review_status?: "pending" | "accepted" | "rejected";
+  review_blocked?: boolean;
+  inventory_source?: string;
+  review_fields?: Pick<
+    ScanFields,
+    "sheet_id" | "material" | "thickness_mm" | "location"
+  >;
+  review_image_base64?: string;
+  review_frame?: { width_mm: number; height_mm: number };
   geometry: Geometry;
   hole_count: number;
   usable_area_mm2: number;
@@ -147,6 +162,8 @@ export interface IndexResult {
   saved_remnant: Remnant | null;
 }
 export interface ScanFields {
+  review_id?: string;
+  location?: string;
   sheet_id: string;
   material: string;
   thickness_mm: number;

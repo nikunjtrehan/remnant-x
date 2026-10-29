@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Capture } from "./Capture";
 import { api } from "./api";
 vi.mock("./api", () => ({
-  api: { preflight: vi.fn(), index: vi.fn() },
+  api: { preflight: vi.fn(), index: vi.fn(), acceptReview: vi.fn(), rejectReview: vi.fn() },
   downloadDxf: vi.fn(),
   downloadText: vi.fn(),
 }));
@@ -39,11 +39,12 @@ describe("capture gate", () => {
       screen.getByLabelText("Station photo"),
       new File(["photo"], "station.png", { type: "image/png" }),
     );
-    await screen.findByText("3 of 4 station markers detected");
+    await screen.findByText("All four station markers must be visible");
+    expect(screen.getByText("Not visible: Bottom right marker 2.")).toBeTruthy();
     expect(
       (
         screen.getByRole("button", {
-          name: /Analyze & add/,
+          name: /Analyze for geometry review/,
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -67,7 +68,7 @@ describe("capture gate", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: /Analyze & add/,
+          name: /Analyze for geometry review/,
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -91,7 +92,7 @@ describe("capture gate", () => {
       "cardboard",
     );
     await userEvent.click(
-      screen.getByRole("button", { name: /Analyze & add/ }),
+      screen.getByRole("button", { name: /Analyze for geometry review/ }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("alert")).toHaveProperty(

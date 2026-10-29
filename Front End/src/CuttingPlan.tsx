@@ -23,12 +23,14 @@ export function CuttingPlan({
   committed,
   busy,
   onCommit,
+  onValidate,
 }: {
   result: PipelineResult | null;
   example: boolean;
   committed: boolean;
   busy: string;
   onCommit: () => void;
+  onValidate?: () => Promise<boolean>;
 }) {
   const [sheetId, setSheetId] = useState("");
   const [selectedPart, setSelectedPart] = useState("");
@@ -74,6 +76,7 @@ export function CuttingPlan({
       setPathPlaying(false);
   }, [pathProgress, program]);
   const complete = shownResult ? batchIsComplete(shownResult) : false;
+  const stale = !!shownResult?.stale_inventory?.length;
   useEffect(() => {
     setSheetId("");
     setSelectedPart("");
@@ -106,10 +109,12 @@ export function CuttingPlan({
             )}
           </div>
           <span
-            className={`badge ${shownResult ? (complete ? "good" : "warn") : "neutral"}`}
+            className={`badge ${shownResult ? (complete && !stale ? "good" : "warn") : "neutral"}`}
           >
             {shownResult ? (
-              complete ? (
+              stale ? (
+                "Outdated plan"
+              ) : complete ? (
                 <>
                   <ShieldCheck size={12} />
                   Software verified
@@ -122,6 +127,28 @@ export function CuttingPlan({
             )}
           </span>
         </div>
+        {stock && (
+          <p className="stock-pick">
+            <strong>
+              {example ? "Example sheet " : "Use physical sheet "}
+              {stock.sheet_id}
+            </strong>{" "}
+            · {stock.material} · {stock.thickness_mm} mm ·{" "}
+            {stock.location || "Location not set — check the stock label"}
+          </p>
+        )}
+        {stale && (
+          <div className="notice warning" role="alert">
+            <div>
+              <strong>This plan is out of date</strong>
+              <p>
+                Stock changed: {shownResult?.stale_inventory?.join(", ")}.
+                Generate and review a new plan before use. If cutting already
+                happened, reconcile the physical sheets with inventory first.
+              </p>
+            </div>
+          </div>
+        )}
         {!!outcomes.length && (
           <div
             className="sheet-tabs"
@@ -233,9 +260,18 @@ export function CuttingPlan({
             <div className="action-row">
               <button
                 className="button secondary"
-                disabled={!program?.verification.verified_safe}
-                onClick={() => {
-                  if (program?.verification.verified_safe)
+                disabled={
+                  stale ||
+                  !!busy ||
+                  !program?.verification.verified_safe ||
+                  (!example && !shownResult.plan_id)
+                }
+                onClick={async () => {
+                  if (
+                    !stale &&
+                    program?.verification.verified_safe &&
+                    (!onValidate || (await onValidate()))
+                  )
                     downloadText(
                       program.gcode_text,
                       `${example ? "example-" : ""}${program.sheet_id}.nc`,
@@ -243,7 +279,11 @@ export function CuttingPlan({
                 }}
               >
                 <ArrowDownToLine size={14} />
-                {example ? "Example G-code" : "Download G-code"}
+                {example
+                  ? "Example G-code"
+                  : committed
+                    ? "Download completed-job G-code"
+                    : "Download G-code"}
               </button>
               <button
                 className={toolpath ? "button secondary" : "button ghost"}
@@ -271,8 +311,10 @@ export function CuttingPlan({
               {example
                 ? "Recorded backend output · synthetic station · no live inference"
                 : committed
-                  ? "Predicted stock updated. This is the newly planned and verified result."
-                  : "Preview only · stock has not changed."}
+                  ? "Operator-reported cut complete · predicted stock updated from this exact plan."
+                  : stale
+                    ? "Outdated plan · current stock must be reviewed before use."
+                    : "Verified program · cutting not confirmed · this plan has not updated stock."}
             </div>
           </>
         ) : (
@@ -376,17 +418,17 @@ export function CuttingPlan({
                 <h3>
                   {committed
                     ? "Stock updated, all sheets together."
-                    : "Ready to update your stock?"}
+                    : "Finished cutting this exact plan?"}
                 </h3>
                 <p>
                   {committed
                     ? "Reindex physical remnants after moving them. No cut has been performed by this application."
-                    : "This action reruns planning, verifies the new result and updates predicted remaining stock atomically."}
+                    : "Report completion using this exact saved program. Current stock is checked again; all sheets update together. A download alone does not record a cut."}
                 </p>
               </div>
               <button
                 className="button secondary"
-                disabled={committed || !!busy}
+                disabled={stale || committed || !!busy || !shownResult?.plan_id}
                 onClick={() => onCommit()}
               >
                 {committed ? (
@@ -396,7 +438,7 @@ export function CuttingPlan({
                   </>
                 ) : (
                   <>
-                    Replan & update stock <ArrowUpRight size={14} />
+                    Record completed cut <ArrowUpRight size={14} />
                   </>
                 )}
               </button>

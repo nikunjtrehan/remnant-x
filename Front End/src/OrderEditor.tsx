@@ -8,10 +8,12 @@ export function OrderEditor({
   order,
   onChange,
   disabled = false,
+  uploadNames = {},
 }: {
   order: Order;
   onChange: (order: Order) => void;
   disabled?: boolean;
+  uploadNames?: Record<string, string>;
 }) {
   const [nextShape, setNextShape] = useState<Part["shape_type"]>("rectangle");
   const updatePart = (i: number, patch: Partial<Part>) =>
@@ -99,6 +101,8 @@ export function OrderEditor({
                 <strong>{p.part_id}</strong>
                 <small>
                   {p.shape_type.replace("_", " ")} · {partDescription(p)}
+                  {p.dxf_path &&
+                    " · " + (uploadNames[p.dxf_path] ?? "Uploaded DXF")}
                 </small>
               </div>
               <button

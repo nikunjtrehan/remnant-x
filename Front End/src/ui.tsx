@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { errorGuidance } from "./errors";
 
 export function ErrorNotice({ message }: { message: string }) {
   if (!message) return null;
+  const guidance = errorGuidance(message);
   return (
     <div className="notice error" role="alert">
       <AlertCircle size={16} />
       <div>
-        <strong>Let’s resolve this first.</strong>
-        <p>{message.replace(/^ERR_[A-Z_]+:\s*/, "")}</p>
+        <strong>{guidance.title}</strong>
+        <p>{guidance.body}</p>
+        {guidance.detail && (
+          <details>
+            <summary>Details for support</summary>
+            <small>{guidance.detail}</small>
+          </details>
+        )}
       </div>
     </div>
   );

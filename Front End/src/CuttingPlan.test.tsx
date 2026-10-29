@@ -9,6 +9,7 @@ vi.mock("./api", () => ({ downloadText: vi.fn() }));
 describe("sheet-specific artifacts", () => {
   it("switches the geometry and download to the selected sheet", async () => {
     const result = structuredClone(raw.result) as unknown as PipelineResult;
+    result.plan_id = "two-sheet-saved-plan";
     const original = result.nesting.sheet_outcomes[0];
     result.nesting.sheet_outcomes.push({
       ...original,

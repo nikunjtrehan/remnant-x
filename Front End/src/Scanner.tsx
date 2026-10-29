@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Archive, Image } from "lucide-react";
 import { Capture } from "./Capture";
 import { PhotoBatch } from "./PhotoBatch";
@@ -6,7 +6,20 @@ import { loadLocal } from "./ui";
 import { defaultStation, validStation } from "./station";
 
 export function Scanner({ onSaved }: { onSaved: () => void }) {
-  const [batch, setBatch] = useState(false);
+  const [batch, setBatch] = useState(() =>
+    loadLocal(
+      "remnantx.scan-batch.v1",
+      false,
+      (v): v is boolean => typeof v === "boolean",
+    ),
+  );
+  useEffect(() => {
+    try {
+      localStorage.setItem("remnantx.scan-batch.v1", JSON.stringify(batch));
+    } catch {
+      /* Session remains usable. */
+    }
+  }, [batch]);
   const [station, setStation] = useState(() =>
       loadLocal("remnantx.station.v1", defaultStation, validStation),
     ),

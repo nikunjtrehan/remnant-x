@@ -15,6 +15,9 @@ import { PhotoRegion } from "./PhotoRegion";
 import { Busy, ErrorNotice, Field, loadLocal } from "./ui";
 import { formatNumber } from "./geometry";
 import { defaultStation, validStation } from "./station";
+import { GeometryReview, StockLabelButton } from "./GeometryReview";
+import { errorGuidance } from "./errors";
+import { loadIntake, saveIntake } from "./recovery";
 import type { IndexResult, Preflight, ScanFields, Station } from "./types";
 
 const locations = ["Top left", "Top right", "Bottom right", "Bottom left"];
@@ -30,6 +33,9 @@ export interface CaptureBinding {
   onStationChange: (station: Station) => void;
   onChecked: (check: Preflight) => void;
   onAnalyze: () => void;
+  onReviewed: (result: IndexResult) => void;
+  onRejected: () => void;
+  onReplace: () => void;
 }
 export function Capture({
   onSaved,
@@ -50,6 +56,10 @@ export function Capture({
   );
   const [image, setImage] = useState(""),
     [filename, setFilename] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null),
+    [fileKey, setFileKey] = useState("");
+  const [restored, setRestored] = useState(!globalThis.indexedDB || !!batch),
+    [recoveryNote, setRecoveryNote] = useState("");
   const [preflight, setPreflight] = useState<Preflight | null>(null);
   const [result, setResult] = useState<IndexResult | null>(null);
   const [error, setError] = useState(""),
@@ -60,6 +70,10 @@ export function Capture({
   );
   const [material, setMaterial] = useState(batch?.fields.material ?? ""),
     [thickness, setThickness] = useState(batch?.fields.thickness_mm ?? 3);
+  const [location, setLocation] = useState(batch?.fields.location ?? "");
+  const [reviewId, setReviewId] = useState(
+    batch?.fields.review_id ?? crypto.randomUUID(),
+  );
   const [concept, setConcept] = useState(
       batch?.fields.segmentation_concept ?? "sheet",
     ),
@@ -72,6 +86,7 @@ export function Capture({
   const locked = !!busy || !!batch?.locked;
   const revision = useRef(0),
     photoInput = useRef<HTMLInputElement>(null);
+  const stationPanel = useRef<HTMLDetailsElement>(null);
   const check = async (photo: string, profile: Station, version: number) => {
     setBusy("Checking markers and calibration");
     setError("");
@@ -85,7 +100,10 @@ export function Capture({
       setBusy("");
     }
   };
-  const choosePhoto = async (file?: File) => {
+  const choosePhoto = async (
+    file?: File,
+    recovered?: { reviewId?: string; hash: string },
+  ) => {
     if (!file || busy) return;
     const version = ++revision.current;
     setPreflight(null);
@@ -96,6 +114,11 @@ export function Capture({
     setFilename("");
     setBox(batch?.fields.segmentation_box_px ?? null);
     setRegionEnabled(false);
+    if (!batch) {
+      setReviewId(recovered?.reviewId ?? crypto.randomUUID());
+      setSourceFile(file);
+      setFileKey(recovered?.hash ?? crypto.randomUUID());
+    }
     if (!/\.(png|jpe?g)$/i.test(file.name) || file.size > 20_000_000) {
       setError("Choose a JPEG or PNG photo under 20 MB.");
       return;
@@ -111,7 +134,10 @@ export function Capture({
       const photo = reader.result as string;
       setImage(photo);
       setFilename(file.name);
-      if (batch?.check) {
+      if (batch?.result) {
+        setResult(batch.result);
+        setBusy("");
+      } else if (batch?.check) {
         setPreflight(batch.check);
         setBusy("");
       } else void check(photo, station, version);
@@ -124,6 +150,109 @@ export function Capture({
       revision.current++;
     };
   }, [batch?.file]);
+  useEffect(() => {
+    if (batch || !globalThis.indexedDB) return;
+    let mounted = true;
+    void loadIntake("single")
+      .then(async (saved) => {
+        const item = saved?.items[0];
+        if (!item || !mounted) return;
+        setSheetId(item.fields.sheet_id);
+        setMaterial(item.fields.material);
+        setThickness(item.fields.thickness_mm);
+        setLocation(item.fields.location ?? "");
+        setConcept(item.fields.segmentation_concept);
+        setClahe(item.fields.use_clahe);
+        setBox(item.fields.segmentation_box_px ?? null);
+        await choosePhoto(item.file, {
+          reviewId: item.fields.review_id,
+          hash: item.hash,
+        });
+        if (
+          item.fields.review_id &&
+          ["indexing", "review", "added", "error"].includes(item.status)
+        ) {
+          try {
+            const recovered = await api.review(item.fields.review_id);
+            if (mounted && recovered.review_status !== "rejected")
+              setResult(recovered);
+            else if (mounted) {
+              setReviewId(crypto.randomUUID());
+              setError(
+                "The earlier capture was rejected. Check the photo and analyze a new review.",
+              );
+            }
+          } catch {
+            if (mounted)
+              setError(
+                "The earlier analysis has not been recovered. Use Recover analysis before retrying.",
+              );
+          }
+        }
+      })
+      .catch((e) => {
+        if (mounted) setRecoveryNote((e as Error).message);
+      })
+      .finally(() => {
+        if (mounted) setRestored(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (batch || !restored || !globalThis.indexedDB) return;
+    void saveIntake("single", {
+      station,
+      items:
+        sourceFile && fileKey
+          ? [
+              {
+                id: reviewId,
+                hash: fileKey,
+                file: sourceFile,
+                revision: 0,
+                status: result?.saved_remnant
+                  ? "added"
+                  : result
+                    ? "review"
+                    : busy.includes("SAM")
+                      ? "indexing"
+                      : "unchecked",
+                fields: {
+                  review_id: reviewId,
+                  sheet_id: sheetId,
+                  material,
+                  thickness_mm: thickness,
+                  location,
+                  segmentation_concept: concept,
+                  use_clahe: clahe,
+                  ...(box ? { segmentation_box_px: box } : {}),
+                },
+              },
+            ]
+          : [],
+    })
+      .then(() =>
+        setRecoveryNote(sourceFile ? "Capture saved on this browser." : ""),
+      )
+      .catch((e) => setRecoveryNote((e as Error).message));
+  }, [
+    sourceFile,
+    fileKey,
+    sheetId,
+    reviewId,
+    material,
+    thickness,
+    location,
+    concept,
+    clahe,
+    box,
+    result,
+    busy,
+    station,
+    restored,
+  ]);
   useEffect(() => {
     if (
       !batch?.result &&
@@ -146,9 +275,11 @@ export function Capture({
       thickness_mm: thickness,
       segmentation_concept: concept,
       use_clahe: clahe,
+      location,
+      review_id: reviewId,
       ...(box ? { segmentation_box_px: box } : {}),
     });
-  }, [sheetId, material, thickness, concept, clahe, box]);
+  }, [sheetId, material, thickness, concept, clahe, box, location, reviewId]);
   const updateStation = (next: Station, notify = true) => {
     revision.current++;
     setStation(next);
@@ -183,10 +314,12 @@ export function Capture({
         thickness_mm: thickness,
         segmentation_concept: concept,
         use_clahe: clahe,
+        location,
+        review_id: reviewId,
         ...(box ? { segmentation_box_px: box } : {}),
       });
       setResult(indexed);
-      onSaved();
+      if (indexed.saved_remnant) onSaved();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -203,13 +336,13 @@ export function Capture({
             <p>All four corners. One flat sheet.</p>
           </div>
         </div>
-        <details className="station-details">
+        <details className="station-details" ref={stationPanel}>
           <summary>
             <Settings2 size={14} />
             <span>{station.name}</span>
             <span className="mono">Edit setup</span>
           </summary>
-          <fieldset disabled={locked}>
+          <fieldset disabled={locked || !!result}>
             <Field label="Station name">
               <input
                 value={station.name}
@@ -286,14 +419,17 @@ export function Capture({
           </div>
         )}
         <div className="marker-checklist">
-          {locations.map((location, id) => {
+          {[0, 1, 3, 2].map((id) => {
+            const location = locations[id];
             const found =
-              preflight?.detected_ids.includes(id) &&
-              !preflight.duplicate_ids.includes(id);
+              !!result ||
+              (preflight?.detected_ids.includes(id) &&
+                !preflight.duplicate_ids.includes(id));
             return (
               <div
                 className={found ? "marker-check found" : "marker-check"}
                 key={id}
+                data-missing={!!preflight && !found}
               >
                 <span className="marker-id">{id}</span>
                 <div>
@@ -305,7 +441,7 @@ export function Capture({
             );
           })}
         </div>
-        {preflight && (
+        {preflight && !result && (
           <div
             className={`notice ${preflight.ready ? "success" : "warning"}`}
             role="status"
@@ -319,18 +455,57 @@ export function Capture({
               <strong>
                 {preflight.ready
                   ? "Ready for analysis"
-                  : `${preflight.detected_ids.length} of 4 station markers detected`}
+                  : preflight.missing_ids.length
+                    ? "All four station markers must be visible"
+                    : preflight.duplicate_ids.length
+                      ? "Duplicate station markers"
+                      : "Station calibration needs attention"}
               </strong>
               <p>
                 {preflight.ready
                   ? `Marker drift ${preflight.scale_drift_mm} mm. Calibration consistency check passed.`
-                  : preflight.issues.map((i) => i.message).join(" ")}
+                  : preflight.missing_ids.length
+                    ? "Not visible: " +
+                      preflight.missing_ids
+                        .map((id) => locations[id] + " marker " + id)
+                        .join(", ") +
+                      "."
+                    : preflight.issues
+                        .map(
+                          (i) => errorGuidance(i.code + ": " + i.message).body,
+                        )
+                        .join(" ")}
               </p>
               {!preflight.ready && (
                 <p>
                   Keep every marker and its white border visible. Replace the
                   photo or correct the station setup.
                 </p>
+              )}
+              {!preflight.ready && (
+                <div className="action-row">
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={locked}
+                    onClick={() =>
+                      batch ? batch.onReplace() : photoInput.current?.click()
+                    }
+                  >
+                    Replace this photo
+                  </button>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={locked}
+                    onClick={() => {
+                      if (stationPanel.current)
+                        stationPanel.current.open = true;
+                    }}
+                  >
+                    Check station setup
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -376,6 +551,48 @@ export function Capture({
             </p>
           </div>
         )}
+        {recoveryNote && !batch && (
+          <p className="hint" role="status">
+            {recoveryNote}
+          </p>
+        )}
+        {!batch && sourceFile && !result && (
+          <button
+            type="button"
+            className="text-button"
+            disabled={locked}
+            onClick={() => {
+              setBusy("Recovering saved analysis");
+              setError("");
+              void api
+                .review(reviewId)
+                .then((recovered) => {
+                  if (recovered.review_status === "rejected") {
+                    setReviewId(crypto.randomUUID());
+                    throw new Error(
+                      "The capture was rejected. Analyze a new review.",
+                    );
+                  }
+                  setResult(recovered);
+                })
+                .catch((e) => setError(e.message))
+                .finally(() => setBusy(""));
+            }}
+          >
+            Recover analysis
+          </button>
+        )}
+        {result && (
+          <div className="notice success">
+            <div>
+              <strong>Calibration passed for this capture</strong>
+              <p>
+                Marker drift {result.scale_drift_mm} mm when analyzed. The
+                reviewed image uses that saved station frame.
+              </p>
+            </div>
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -390,6 +607,18 @@ export function Capture({
                 value={sheetId}
                 maxLength={120}
                 onChange={(e) => setSheetId(e.target.value)}
+              />
+            </Field>
+            <p className="hint">
+              Use the ID written on the physical sheet. Another view of the same
+              sheet is not new stock.
+            </p>
+            <Field label="Rack / storage location">
+              <input
+                value={location}
+                maxLength={120}
+                placeholder="e.g. Rack B / slot 3"
+                onChange={(e) => setLocation(e.target.value)}
               />
             </Field>
             <div className="field-grid">
@@ -431,9 +660,10 @@ export function Capture({
               <span className="muted">Optional</span>
             </label>
             <p className="hint">
-              Analysis sends the rectified photo to Meta SAM 3.1 and adds the
-              accepted geometry to inventory. Existing holes need no manual
-              measurements.
+              Place one flat sheet fully inside the station. Clear hands,
+              clamps, overlap and glare from its outline and holes. SAM analysis
+              is followed by a visual review before stock becomes available. No
+              hole measurements are needed.
             </p>
             <button
               className="button primary full"
@@ -441,13 +671,13 @@ export function Capture({
               type="submit"
             >
               <ScanLine size={15} />
-              Analyze & add to inventory
+              Analyze for geometry review
             </button>
           </fieldset>
         </form>
         {busy && <Busy label={busy} />}
         <ErrorNotice message={error} />
-        {result && (
+        {result?.saved_remnant && (
           <div className="notice success">
             <CheckCircle2 size={17} />
             <div>
@@ -456,6 +686,7 @@ export function Capture({
                 {result.saved_remnant?.sheet_id} · {result.hole_count} cutout
                 {result.hole_count === 1 ? "" : "s"} preserved
               </p>
+              <StockLabelButton result={result} />
               {!batch && (
                 <button
                   className="text-button"
@@ -463,6 +694,9 @@ export function Capture({
                     setResult(null);
                     setSheetId(`REM_${Date.now().toString(36).toUpperCase()}`);
                     setImage("");
+                    setSourceFile(null);
+                    setFileKey("");
+                    setReviewId(crypto.randomUUID());
                     setPreflight(null);
                     setFilename("");
                   }}
@@ -482,7 +716,9 @@ export function Capture({
             </span>
             <h2>
               {result
-                ? "Every cutout accounted for."
+                ? result.saved_remnant
+                  ? "Accepted remnant geometry."
+                  : "Check the outline. Check every hole."
                 : image
                   ? "A good capture starts at the corners."
                   : "Give your offcut a second life."}
@@ -490,16 +726,35 @@ export function Capture({
           </div>
           <span className="badge neutral">
             {result
-              ? result.saved_remnant?.inventory_source === "sam"
+              ? (result.saved_remnant?.inventory_source ??
+                  result.inventory_source) === "sam"
                 ? "SAM 3.1"
-                : (result.saved_remnant?.inventory_source?.replaceAll(
-                    "_",
-                    " ",
-                  ) ?? "Indexed geometry")
+                : ((
+                    result.saved_remnant?.inventory_source ??
+                    result.inventory_source
+                  )?.replaceAll("_", " ") ?? "Indexed geometry")
               : "Live capture"}
           </span>
         </div>
-        {result ? (
+        {result?.review_id && !result.saved_remnant ? (
+          <GeometryReview
+            key={result.review_id}
+            result={result}
+            onAccepted={(accepted) => {
+              setResult(accepted);
+              batch?.onReviewed(accepted);
+              onSaved();
+            }}
+            onRejected={() => {
+              setResult(null);
+              setReviewId(crypto.randomUUID());
+              setPreflight(null);
+              setBox(null);
+              setRegionEnabled(false);
+              batch?.onRejected();
+            }}
+          />
+        ) : result ? (
           <>
             <SheetViewer
               geometry={result.geometry}

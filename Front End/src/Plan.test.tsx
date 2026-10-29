@@ -4,9 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { Plan } from "./Plan";
 import { batchIsComplete } from "./verification";
 import { api } from "./api";
+import { StrictMode } from "react";
 import type { Geometry, Order, PipelineResult } from "./types";
 vi.mock("./api", () => ({
-  api: { parse: vi.fn(), execute: vi.fn(), upload: vi.fn() },
+  api: {
+    parse: vi.fn(),
+    execute: vi.fn(),
+    upload: vi.fn(),
+    confirmPlan: vi.fn(),
+    plan: vi.fn(),
+  },
   downloadText: vi.fn(),
 }));
 const geometry: Geometry = {
@@ -30,6 +37,7 @@ const order: Order = {
   ],
 };
 const result: PipelineResult = {
+  plan_id: "saved-plan-test",
   status: "BATCH_COMPLETED",
   machine_profile: "ISO_6983_GRBL",
   timings_ms: { total_ms: 100 },
@@ -111,7 +119,10 @@ const props = {
   onInventory: vi.fn(),
   example: false,
 };
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  localStorage.clear();
+});
 async function parseOrder() {
   vi.mocked(api.parse).mockResolvedValue({
     order: structuredClone(order),
@@ -125,6 +136,116 @@ async function parseOrder() {
   await screen.findByLabelText("Quantity · DISC");
 }
 describe("order workflow", () => {
+  it("does not overwrite a saved draft during development StrictMode remounts", async () => {
+    localStorage.setItem(
+      "remnantx.order.v1",
+      JSON.stringify({
+        prompt: "Saved factory job",
+        order,
+        settings: {
+          machine_profile: "ISO_6983_GRBL",
+          allow_demo_stock: false,
+          lead_in_radius_mm: 0,
+          cut_feedrate_mm_min: 1800,
+          laser_power_s: 1000,
+          pierce_delay_sec: 0.4,
+        },
+        uploads: [],
+        inputMode: "prompt",
+        planId: "saved-plan-test",
+      }),
+    );
+    render(
+      <StrictMode>
+        <Plan {...props} />
+      </StrictMode>,
+    );
+    await screen.findByRole("button", { name: "Recover saved plan" });
+    expect(
+      (screen.getByLabelText("Manufacturing request") as HTMLTextAreaElement)
+        .value,
+    ).toBe("Saved factory job");
+    expect(JSON.parse(localStorage.getItem("remnantx.order.v1")!).planId).toBe(
+      "saved-plan-test",
+    );
+    expect(api.parse).not.toHaveBeenCalled();
+    expect(api.execute).not.toHaveBeenCalled();
+  });
+  it("records an operator-confirmed cut using the reviewed plan without a second execution", async () => {
+    vi.mocked(api.execute).mockResolvedValue(result);
+    vi.mocked(api.confirmPlan).mockResolvedValue({
+      ...result,
+      operator_confirmed_at: "2026-10-30T12:00:00Z",
+      committed_remnants: result.candidate_sheets,
+    });
+    render(<Plan {...props} />);
+    await parseOrder();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Nest & verify" }),
+    );
+    await screen.findByText("Software verified");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Record completed cut" }),
+    );
+    const confirm = screen.getByRole("button", {
+      name: "Confirm completed cut & update stock",
+    });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /I used this exact program/ }),
+    );
+    await userEvent.click(confirm);
+    await screen.findByText("Stock updated, all sheets together.");
+    expect(api.confirmPlan).toHaveBeenCalledWith("saved-plan-test");
+    expect(api.execute).toHaveBeenCalledTimes(1);
+  });
+  it("restores the order draft and recovers a saved result without parsing or nesting again", async () => {
+    vi.mocked(api.execute).mockResolvedValue(result);
+    vi.mocked(api.plan).mockResolvedValue(result);
+    const first = render(<Plan {...props} />);
+    await parseOrder();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Nest & verify" }),
+    );
+    await screen.findByText("Software verified");
+    first.unmount();
+    render(<Plan {...props} />);
+    expect(
+      (screen.getByLabelText("Quantity · DISC") as HTMLInputElement).value,
+    ).toBe("2");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Recover saved plan" }),
+    );
+    await screen.findByText("Software verified");
+    expect(api.plan).toHaveBeenCalledWith("saved-plan-test");
+    expect(api.parse).toHaveBeenCalledTimes(1);
+    expect(api.execute).toHaveBeenCalledTimes(1);
+  });
+  it("blocks program export when current stock no longer matches the saved plan", async () => {
+    vi.mocked(api.execute).mockResolvedValue(result);
+    vi.mocked(api.plan).mockResolvedValue({
+      ...result,
+      stale_inventory: ["S1"],
+    });
+    render(<Plan {...props} />);
+    await parseOrder();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Nest & verify" }),
+    );
+    await screen.findByText("Software verified");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Download G-code" }),
+    );
+    await screen.findByText("This plan is out of date");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Download G-code",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(api.confirmPlan).not.toHaveBeenCalled();
+  });
   it("attaches an uploaded DXF to a natural-language request for fifty copies", async () => {
     vi.mocked(api.upload).mockResolvedValue({
       filename: "part.dxf",
@@ -180,7 +301,7 @@ describe("order workflow", () => {
     expect(api.execute).toHaveBeenCalledWith(
       expect.objectContaining({ material: "ss304" }),
       expect.anything(),
-      false,
+      expect.any(String),
     );
     await userEvent.clear(screen.getByLabelText("Quantity · DISC"));
     expect(

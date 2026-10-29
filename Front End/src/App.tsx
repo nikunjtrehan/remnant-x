@@ -15,12 +15,26 @@ import { Scanner } from "./Scanner";
 import { ExampleTour } from "./ExampleTour";
 import { Inventory } from "./Inventory";
 import { api } from "./api";
-import { Busy, ErrorNotice, Modal } from "./ui";
+import { Busy, ErrorNotice, Modal, loadLocal } from "./ui";
 import type { Recording, Remnant } from "./types";
 
 export default function App() {
-  const [tab, setTab] = useState("Plan a job");
-  const [example, setExample] = useState(true),
+  const [tab, setTab] = useState(() =>
+    loadLocal(
+      "remnantx.view.v1",
+      "Plan a job",
+      (v): v is string =>
+        typeof v === "string" &&
+        ["Plan a job", "Scan a remnant", "Inventory"].includes(v),
+    ),
+  );
+  const [example, setExample] = useState(() =>
+      loadLocal(
+        "remnantx.example.v1",
+        true,
+        (v): v is boolean => typeof v === "boolean",
+      ),
+    ),
     [tour, setTour] = useState(false);
   const [recording, setRecording] = useState<Recording | null>(null),
     [recordingError, setRecordingError] = useState("");
@@ -43,6 +57,14 @@ export default function App() {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    try {
+      localStorage.setItem("remnantx.view.v1", JSON.stringify(tab));
+      localStorage.setItem("remnantx.example.v1", JSON.stringify(example));
+    } catch {
+      /* The current view still works when browser storage is unavailable. */
+    }
+  }, [tab, example]);
   useEffect(() => {
     void api
       .health()
@@ -120,7 +142,17 @@ export default function App() {
           </div>
         </div>
       </aside>
-      <main className="main">
+      <main
+        className="main"
+        onWheelCapture={(e) => {
+          // Scrolling a long form must not change thickness, quantities or process values.
+          if (
+            e.target instanceof HTMLInputElement &&
+            e.target.type === "number"
+          )
+            e.target.blur();
+        }}
+      >
         <header className="topbar">
           <div className="breadcrumb">
             Workspace <ChevronRight size={13} />

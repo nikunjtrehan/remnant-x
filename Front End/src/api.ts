@@ -70,7 +70,8 @@ export const api = {
       image_base64: image,
       ...stationPayload(station),
       ...fields,
-      save_to_warehouse: true,
+      review_id: fields.review_id ?? crypto.randomUUID(),
+      save_to_warehouse: false,
       segmentation_mode: "sam",
     }),
   parse: (prompt: string, uploads: string[]) =>
@@ -83,11 +84,39 @@ export const api = {
     form.append("file", file);
     return request<Upload>("upload-dxf", undefined, form);
   },
-  execute: (order: Order, settings: ProcessSettings, commit = false) =>
+  reviews: () =>
+    request<{
+      reviews: {
+        review_id: string;
+        fields: NonNullable<IndexResult["review_fields"]>;
+      }[];
+    }>("intake-reviews"),
+  review: (id: string) =>
+    request<IndexResult>("intake-reviews/" + encodeURIComponent(id)),
+  acceptReview: (id: string) =>
+    request<IndexResult>(
+      "intake-reviews/" + encodeURIComponent(id) + "/accept",
+      {},
+    ),
+  rejectReview: (id: string) =>
+    request("intake-reviews/" + encodeURIComponent(id) + "/reject", {}),
+  location: (id: string, location: string) =>
+    request<Remnant>("remnants/" + encodeURIComponent(id) + "/location", {
+      location,
+    }),
+  plan: (id: string) =>
+    request<PipelineResult>("verified-plans/" + encodeURIComponent(id)),
+  confirmPlan: (id: string) =>
+    request<PipelineResult>(
+      "verified-plans/" + encodeURIComponent(id) + "/confirm",
+      { operator_confirmed: true },
+    ),
+  execute: (order: Order, settings: ProcessSettings, planId?: string) =>
     request<PipelineResult>("execute-pipeline", {
       order,
       ...settings,
-      commit_cuts_to_db: commit,
+      commit_cuts_to_db: false,
+      ...(planId ? { plan_id: planId } : {}),
     }),
 };
 export function downloadText(

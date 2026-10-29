@@ -13,6 +13,7 @@ import { CuttingPlan } from "./CuttingPlan";
 import { OrderEditor } from "./OrderEditor";
 import { Busy, ErrorNotice, Field, Modal } from "./ui";
 import { formatNumber, geometryPath, partDescription } from "./geometry";
+import { loadOrderDraft, saveOrderDraft } from "./recovery";
 import type {
   Order,
   PipelineResult,
@@ -58,6 +59,10 @@ export function Plan({
     [trace, setTrace] = useState<Record<string, unknown> | null>(null);
   const [commitDialog, setCommitDialog] = useState(false),
     [committed, setCommitted] = useState(false);
+  const [planId, setPlanId] = useState(""),
+    [cutConfirmed, setCutConfirmed] = useState(false),
+    [recoveryNote, setRecoveryNote] = useState("");
+  const [restoredDraft, setRestoredDraft] = useState(false);
   const uploadInput = useRef<HTMLInputElement>(null);
   // Example and live states stay separate. Switching modes never seeds inventory or starts inference.
   const shownResult = example ? (sample?.result ?? null) : result;
@@ -66,6 +71,7 @@ export function Plan({
     setResult(null);
     setCommitted(false);
     setError("");
+    setPlanId("");
   };
   const editOrder = (next: Order) => {
     invalidate();
@@ -150,15 +156,33 @@ export function Plan({
     setError("");
     setBusy(
       commit
-        ? "Replanning, verifying and updating predicted stock"
+        ? "Recording completion of the exact reviewed program"
         : "Nesting and verifying your cutting plan",
     );
-    setResult(null);
+    if (!commit) setResult(null);
     setCommitted(false);
     setCommitDialog(false);
     try {
-      const planned = await api.execute(order, settings, commit);
+      if (commit && (!result?.plan_id || !cutConfirmed))
+        throw new Error(
+          "Confirm that the reviewed program was used and cutting completed.",
+        );
+      const id = planId || crypto.randomUUID();
+      setPlanId(id);
+      saveOrderDraft({
+        prompt,
+        order,
+        settings,
+        uploads,
+        inputMode,
+        planId: id,
+      });
+      const planned = commit
+        ? await api.confirmPlan(result!.plan_id!)
+        : await api.execute(order, settings, id);
       setResult(planned);
+      if (planned.plan_id) setPlanId(planned.plan_id);
+      if (planned.stale_inventory?.length) setPlanId("");
       setCommitted(commit);
       if (commit) onInventoryChanged();
     } catch (e) {
@@ -167,6 +191,74 @@ export function Plan({
       setBusy("");
     }
   };
+  const recoverPlan = async (id = planId) => {
+    if (!id) return;
+    setBusy("Recovering the saved plan without nesting again");
+    setError("");
+    try {
+      const recovered = await api.plan(id);
+      setResult(recovered);
+      setCommitted(!!recovered.operator_confirmed_at);
+      if (recovered.stale_inventory?.length) setPlanId("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  };
+  const validateDownload = async () => {
+    if (!result?.plan_id) return false;
+    setBusy("Checking current stock before program download");
+    setError("");
+    try {
+      const current = await api.plan(result.plan_id);
+      setResult(current);
+      if (current.stale_inventory?.length) {
+        setPlanId("");
+        return false;
+      }
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
+      return false;
+    } finally {
+      setBusy("");
+    }
+  };
+  useEffect(() => {
+    const draft = loadOrderDraft<{
+      prompt: string;
+      order: Order | null;
+      settings: ProcessSettings;
+      uploads: (Upload & { quantity: number })[];
+      inputMode: "prompt" | "parts";
+      planId: string;
+    }>();
+    if (
+      draft &&
+      typeof draft.prompt === "string" &&
+      draft.settings &&
+      Array.isArray(draft.uploads)
+    ) {
+      setPrompt(draft.prompt);
+      setOrder(draft.order);
+      setSettings(draft.settings);
+      setUploads(draft.uploads);
+      setInputMode(draft.inputMode);
+      setPlanId(draft.planId || "");
+      setRecoveryNote(
+        "Local job draft restored. Recover a saved plan or review the order before planning.",
+      );
+    }
+    setRestoredDraft(true);
+  }, []);
+  useEffect(() => {
+    if (!restoredDraft) return;
+    if (
+      !saveOrderDraft({ prompt, order, settings, uploads, inputMode, planId })
+    )
+      setRecoveryNote("Job recovery could not be saved. Keep this page open.");
+  }, [prompt, order, settings, uploads, inputMode, planId, restoredDraft]);
   const inventoryFingerprint = JSON.stringify(
     inventory.map((s) => [
       s.sheet_id,
@@ -384,6 +476,16 @@ export function Plan({
                         {u.hole_count} holes ·{" "}
                         {formatNumber(u.geometry.area_mm2 / 100)} cm²
                       </small>
+                      <small>
+                        {formatNumber(
+                          u.geometry.bounds[2] - u.geometry.bounds[0],
+                        )}{" "}
+                        ×{" "}
+                        {formatNumber(
+                          u.geometry.bounds[3] - u.geometry.bounds[1],
+                        )}{" "}
+                        mm
+                      </small>
                     </div>
                     <input
                       aria-label={`Quantity for ${u.filename} ${i + 1}`}
@@ -491,6 +593,9 @@ export function Plan({
                 >
                   <div className="divider" />
                   <OrderEditor
+                    uploadNames={Object.fromEntries(
+                      uploads.map((u) => [u.dxf_path, u.filename]),
+                    )}
                     order={order}
                     onChange={editOrder}
                     disabled={!!busy}
@@ -604,6 +709,28 @@ export function Plan({
                       View →
                     </button>
                   </div>
+                  {!compatible.length && order.material.trim() && (
+                    <div className="notice warning">
+                      <div>
+                        <strong>
+                          No matching {order.thickness_mm} mm {order.material}{" "}
+                          stock
+                        </strong>
+                        <p>
+                          {inventory.length
+                            ? "Other grades or thicknesses are not substituted. Check stock labels and add matching material, or revise this order."
+                            : "Add an accepted remnant before planning this job."}
+                        </p>
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={onInventory}
+                        >
+                          Inspect inventory →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <button
                     className="button primary full"
                     type="submit"
@@ -622,6 +749,21 @@ export function Plan({
             </>
           )}
           {busy && <Busy label={busy} />}
+          {!example && recoveryNote && (
+            <p className="hint" role="status">
+              {recoveryNote}
+            </p>
+          )}
+          {!example && planId && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={!!busy}
+              onClick={() => void recoverPlan()}
+            >
+              Recover saved plan
+            </button>
+          )}
           <ErrorNotice message={error} />
         </section>
         <CuttingPlan
@@ -629,24 +771,36 @@ export function Plan({
           example={example}
           committed={committed}
           busy={busy}
-          onCommit={() => setCommitDialog(true)}
+          onCommit={() => {
+            setCutConfirmed(false);
+            setCommitDialog(true);
+          }}
+          onValidate={example ? undefined : validateDownload}
         />
       </div>
       {commitDialog && (
         <Modal
-          title="Update predicted remaining stock?"
+          title="Record completion of this exact cutting plan?"
           onClose={() => setCommitDialog(false)}
         >
           <p>
-            The backend will plan this order again against current stock. The
-            returned layout may differ from this preview. Every resulting
-            program must verify before any sheet changes.
+            This uses the exact saved layout and verified programs you reviewed.
+            Inventory must still match the original sheets. Changed stock blocks
+            the whole update and requires a new plan.
           </p>
           <p>
-            This records a predicted cut. It does not send instructions to a
-            machine or confirm fabrication. Inspect the returned result before
-            using its output.
+            Completion is reported by the operator. No machine is connected;
+            remaining geometry is predicted from this verified program.
           </p>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={cutConfirmed}
+              onChange={(e) => setCutConfirmed(e.target.checked)}
+            />
+            I used this exact program on the listed sheets and completed the
+            cut.
+          </label>
           <div className="modal-actions">
             <button
               className="button secondary"
@@ -654,8 +808,12 @@ export function Plan({
             >
               Keep preview
             </button>
-            <button className="button primary" onClick={() => void run(true)}>
-              Replan & update stock
+            <button
+              className="button primary"
+              disabled={!cutConfirmed || !!busy}
+              onClick={() => void run(true)}
+            >
+              Confirm completed cut & update stock
             </button>
           </div>
         </Modal>

@@ -15,6 +15,7 @@ import { collectPhotos, readFile } from "./photo-import";
 import type { SourcePhoto } from "./photo-import";
 import { Busy, ErrorNotice, Field, loadLocal } from "./ui";
 import { defaultStation, validStation } from "./station";
+import { loadIntake, saveIntake } from "./recovery";
 import type { IndexResult, Preflight, ScanFields, Station } from "./types";
 
 type Status =
@@ -23,6 +24,7 @@ type Status =
   | "ready"
   | "blocked"
   | "indexing"
+  | "review"
   | "added"
   | "error";
 interface Item extends SourcePhoto {
@@ -34,12 +36,34 @@ interface Item extends SourcePhoto {
   error?: string;
   revision: number;
 }
+function recoveredReview(item: Item, result: IndexResult): Partial<Item> {
+  if (result.review_status === "rejected")
+    return {
+      result: undefined,
+      check: undefined,
+      status: "unchecked",
+      revision: item.revision + 1,
+      fields: {
+        ...item.fields,
+        review_id: crypto.randomUUID(),
+        segmentation_box_px: undefined,
+      },
+      error:
+        "The earlier geometry was rejected. Replace the photo or refine its region before a new analysis.",
+    };
+  return {
+    result,
+    status: result.saved_remnant ? "added" : "review",
+    error: "",
+  };
+}
 const statusLabel: Record<Status, string> = {
   unchecked: "Needs check",
   checking: "Checking markers",
   ready: "Ready for SAM",
   blocked: "Photo needs attention",
   indexing: "SAM is analyzing",
+  review: "Review geometry",
   added: "Added to inventory",
   error: "Analysis not confirmed",
 };
@@ -80,6 +104,8 @@ export function PhotoBatch({
     [error, setError] = useState("");
   const [defaults, setDefaults] = useState({ material: "", thickness: 3 }),
     [stopping, setStopping] = useState(false);
+  const [restored, setRestored] = useState(!globalThis.indexedDB),
+    [recoveryNote, setRecoveryNote] = useState("");
   const input = useRef<HTMLInputElement>(null),
     replaceId = useRef(""),
     active = useRef(false),
@@ -91,20 +117,20 @@ export function PhotoBatch({
     (fields: ScanFields) =>
       setItems((old) =>
         old.map((i) =>
-          i.id === selectedId &&
+          i.id === selected?.id &&
           JSON.stringify(i.fields) !== JSON.stringify(fields)
             ? { ...i, fields }
             : i,
         ),
       ),
-    [selectedId],
+    [selected?.id],
   );
   const checked = useCallback(
     (check: Preflight) =>
       setItems((old) =>
         old.map((i) =>
-          i.id === selectedId &&
-          !["added", "indexing", "error"].includes(i.status)
+          i.id === selected?.id &&
+          !["added", "indexing", "review", "error"].includes(i.status)
             ? {
                 ...i,
                 check,
@@ -114,7 +140,7 @@ export function PhotoBatch({
             : i,
         ),
       ),
-    [selectedId],
+    [selected?.id],
   );
   const changeStation = useCallback(
     (next: Station) => {
@@ -122,7 +148,7 @@ export function PhotoBatch({
       onStationProfileChange?.(next);
       setItems((old) =>
         old.map((i) =>
-          i.status === "added"
+          i.status === "added" || i.status === "review"
             ? i
             : {
                 ...i,
@@ -146,8 +172,89 @@ export function PhotoBatch({
   useEffect(() => {
     onBusyChange?.(!!busy);
   }, [busy, onBusyChange]);
+  useEffect(() => {
+    if (!globalThis.indexedDB) return;
+    let mounted = true;
+    void loadIntake("batch")
+      .then(async (saved) => {
+        if (!saved || !mounted) return;
+        const rows = await Promise.all(
+          saved.items.map(async (item) => {
+            const row = {
+              ...item,
+              label: item.label ?? item.file.name,
+              status: "unchecked",
+            } as Item;
+            if (
+              ["indexing", "error", "review", "added"].includes(item.status) &&
+              item.fields.review_id
+            ) {
+              try {
+                const result = await api.review(item.fields.review_id);
+                Object.assign(row, recoveredReview(row, result));
+              } catch {
+                row.status = "error";
+                row.error =
+                  "The saved analysis has not been recovered. Use Recover analyses before retrying.";
+              }
+            }
+            return row;
+          }),
+        );
+        if (mounted) {
+          setItems(rows);
+          setSelectedId(saved.selectedId ?? rows[0]?.id ?? "");
+          if (saved.defaults) setDefaults(saved.defaults);
+        }
+      })
+      .catch((e) => {
+        if (mounted) setRecoveryNote((e as Error).message);
+      })
+      .finally(() => {
+        if (mounted) setRestored(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!restored || !globalThis.indexedDB) return;
+    void saveIntake("batch", { items, station, defaults, selectedId })
+      .then(() =>
+        setRecoveryNote(
+          items.length
+            ? "Queue saved on this browser · analysis does not restart on reload."
+            : "",
+        ),
+      )
+      .catch((e) => setRecoveryNote((e as Error).message));
+  }, [items, station, defaults, selectedId, restored]);
+  const recover = async () => {
+    if (active.current) return;
+    active.current = true;
+    setBusy("Recovering saved analyses without running SAM");
+    setError("");
+    try {
+      for (const item of items.filter(
+        (i) => i.status !== "added" && i.fields.review_id,
+      )) {
+        try {
+          const result = await api.review(item.fields.review_id!);
+          patch(item.id, recoveredReview(item, result));
+        } catch (e) {
+          if (!(e as Error).message.includes("REVIEW_NOT_FOUND")) throw e;
+        }
+      }
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      active.current = false;
+      setBusy("");
+    }
+  };
   const importFiles = async (files: File[]) => {
-    if (active.current || !files.length) return;
+    if (active.current || !restored || !files.length) return;
     active.current = true;
     setBusy("Opening photos and ZIP archives");
     setError("");
@@ -170,7 +277,11 @@ export function PhotoBatch({
           result: undefined,
           error: "",
           revision: replacing.revision + 1,
-          fields: { ...replacing.fields, segmentation_box_px: undefined },
+          fields: {
+            ...replacing.fields,
+            segmentation_box_px: undefined,
+            review_id: crypto.randomUUID(),
+          },
         });
       } else {
         const rows = imported.accepted.map((source) => {
@@ -184,6 +295,8 @@ export function PhotoBatch({
               thickness_mm: defaults.thickness,
               segmentation_concept: "sheet",
               use_clahe: false,
+              review_id: crypto.randomUUID(),
+              location: "",
             },
             status: "unchecked" as const,
             revision: 0,
@@ -206,7 +319,9 @@ export function PhotoBatch({
     stop.current = false;
     setStopping(false);
     setError("");
-    const pending = items.filter((i) => i.status !== "added");
+    const pending = items.filter(
+      (i) => !["added", "review"].includes(i.status),
+    );
     try {
       for (let n = 0; n < pending.length; n++) {
         if (stop.current) break;
@@ -289,12 +404,15 @@ export function PhotoBatch({
             station,
             item.fields,
           );
-          if (!result.saved_remnant)
+          if (!result.saved_remnant && !result.review_id)
             throw new Error(
               "Inventory save was not confirmed. Refresh inventory before retrying.",
             );
-          patch(item.id, { status: "added", result });
-          onSaved();
+          patch(item.id, {
+            status: result.saved_remnant ? "added" : "review",
+            result,
+          });
+          if (result.saved_remnant) onSaved();
         } catch (e) {
           patch(item.id, { status: "error", error: (e as Error).message });
         }
@@ -308,6 +426,7 @@ export function PhotoBatch({
     }
   };
   const counts = {
+    review: items.filter((i) => i.status === "review").length,
     ready: items.filter((i) => i.status === "ready").length,
     added: items.filter((i) => i.status === "added").length,
     attention: items.filter((i) => ["blocked", "error"].includes(i.status))
@@ -316,6 +435,12 @@ export function PhotoBatch({
   return (
     <>
       <section className="panel batch-panel">
+        {!restored && <Busy label="Restoring the local photo queue" />}
+        {recoveryNote && (
+          <p className="hint" role="status">
+            {recoveryNote}
+          </p>
+        )}
         <div className="batch-heading">
           <div>
             <span className="eyebrow">
@@ -336,7 +461,7 @@ export function PhotoBatch({
           className="sr-only"
           accept=".jpg,.jpeg,.png,.zip"
           aria-label="Batch station photos or ZIP"
-          disabled={!!busy}
+          disabled={!!busy || !restored}
           onChange={(e) => {
             void importFiles(Array.from(e.target.files ?? []));
             e.target.value = "";
@@ -345,7 +470,7 @@ export function PhotoBatch({
         <div className="batch-start">
           <button
             className="batch-drop"
-            disabled={!!busy}
+            disabled={!!busy || !restored}
             onClick={() => {
               replaceId.current = "";
               input.current?.click();
@@ -369,7 +494,7 @@ export function PhotoBatch({
               e.preventDefault();
               setItems((old) =>
                 old.map((i) =>
-                  i.status === "added"
+                  i.status === "added" || i.status === "review"
                     ? i
                     : {
                         ...i,
@@ -414,7 +539,10 @@ export function PhotoBatch({
             </Field>
             <button
               className="button secondary"
-              disabled={!!busy || !items.some((i) => i.status !== "added")}
+              disabled={
+                !!busy ||
+                !items.some((i) => !["added", "review"].includes(i.status))
+              }
             >
               Apply to pending photos
             </button>
@@ -433,6 +561,14 @@ export function PhotoBatch({
         {!!items.length && (
           <>
             <div className="batch-actions">
+              <button
+                type="button"
+                className="button secondary"
+                disabled={!!busy}
+                onClick={() => void recover()}
+              >
+                Recover analyses
+              </button>
               <button
                 className="button secondary"
                 disabled={!!busy || items.every((i) => i.status === "added")}
@@ -468,6 +604,8 @@ export function PhotoBatch({
               <span className="batch-counts" role="status">
                 {counts.added} added · {counts.ready} ready · {counts.attention}{" "}
                 need attention
+                {counts.review > 0 &&
+                  " · " + counts.review + " awaiting review"}
               </span>
               <button
                 className="text-button"
@@ -517,7 +655,7 @@ export function PhotoBatch({
                     </span>
                   </button>
                   <div className="batch-row-actions">
-                    {item.status !== "added" && (
+                    {!["added", "review"].includes(item.status) && (
                       <button
                         className="icon-button"
                         aria-label={`Replace photo ${i + 1}`}
@@ -578,6 +716,24 @@ export function PhotoBatch({
             onStationChange: changeStation,
             onChecked: checked,
             onAnalyze: () => void analyze([selected.id]),
+            onReviewed: (result) =>
+              patch(selected.id, { result, status: "added", error: "" }),
+            onRejected: () =>
+              patch(selected.id, {
+                result: undefined,
+                check: undefined,
+                status: "unchecked",
+                revision: selected.revision + 1,
+                fields: {
+                  ...selected.fields,
+                  review_id: crypto.randomUUID(),
+                  segmentation_box_px: undefined,
+                },
+              }),
+            onReplace: () => {
+              replaceId.current = selected.id;
+              input.current?.click();
+            },
           }}
         />
       )}

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, Boxes, RefreshCw, Search, ScanLine } from "lucide-react";
 import { SheetViewer } from "./SheetViewer";
-import { Busy, ErrorNotice, Modal } from "./ui";
+import { Busy, ErrorNotice, Modal, Field } from "./ui";
 import { api, downloadText } from "./api";
 import { formatNumber } from "./geometry";
 import type { Remnant } from "./types";
+import type { IndexResult } from "./types";
+import { GeometryReview } from "./GeometryReview";
+import { stockLabel } from "./stock-label";
 
 export function Inventory({
   remnants,
@@ -26,12 +29,37 @@ export function Inventory({
   const [seedConfirm, setSeedConfirm] = useState(false),
     [seeding, setSeeding] = useState(false),
     [seedError, setSeedError] = useState("");
+  const [location, setLocation] = useState(""),
+    [editing, setEditing] = useState(false),
+    [stockError, setStockError] = useState("");
+  const [reviewsOpen, setReviewsOpen] = useState(false),
+    [reviews, setReviews] = useState<
+      { review_id: string; fields: NonNullable<IndexResult["review_fields"]> }[]
+    >([]);
+  const [review, setReview] = useState<IndexResult | null>(null),
+    [reviewBusy, setReviewBusy] = useState("");
   const list = remnants.filter((r) =>
-    `${r.sheet_id} ${r.material} ${r.thickness_mm}`
+    `${r.sheet_id} ${r.material} ${r.thickness_mm} ${r.location ?? ""}`
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
   const selected = list.find((r) => r.sheet_id === selectedId) ?? list[0];
+  useEffect(() => {
+    setLocation(selected?.location ?? "");
+    setStockError("");
+  }, [selected?.sheet_id, selected?.location]);
+  const loadReviews = async () => {
+    setReviewsOpen(true);
+    setReviewBusy("Finding pending geometry reviews");
+    setStockError("");
+    try {
+      setReviews((await api.reviews()).reviews);
+    } catch (e) {
+      setStockError((e as Error).message);
+    } finally {
+      setReviewBusy("");
+    }
+  };
   const seed = async () => {
     setSeeding(true);
     setSeedError("");
@@ -72,6 +100,13 @@ export function Inventory({
           <ScanLine size={15} />
           Scan a remnant
         </button>
+        <button
+          className="button secondary"
+          disabled={example || loading}
+          onClick={() => void loadReviews()}
+        >
+          Recover pending reviews
+        </button>
       </div>
       {loading && <Busy label="Retrieving warehouse inventory" />}
       <ErrorNotice message={error} />
@@ -103,6 +138,7 @@ export function Inventory({
                     ? "SAM 3.1 capture"
                     : r.inventory_source}
                 </span>
+                <small>{r.location || "Location not set"}</small>
               </span>
               <ArrowUpRight size={14} />
             </button>
@@ -175,6 +211,18 @@ export function Inventory({
                   className="button secondary"
                   onClick={() =>
                     downloadText(
+                      stockLabel(selected),
+                      selected.sheet_id + ".label.svg",
+                      "image/svg+xml",
+                    )
+                  }
+                >
+                  Download printable stock label
+                </button>
+                <button
+                  className="button secondary"
+                  onClick={() =>
+                    downloadText(
                       JSON.stringify(selected, null, 2),
                       `${selected.sheet_id}.json`,
                       "application/json",
@@ -184,10 +232,102 @@ export function Inventory({
                   Download sheet record <ArrowUpRight size={13} />
                 </button>
               </div>
+              {!example && (
+                <form
+                  className="stock-location"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setEditing(true);
+                    setStockError("");
+                    void api
+                      .location(selected.sheet_id, location)
+                      .then(() => onRefresh())
+                      .catch((err) => setStockError(err.message))
+                      .finally(() => setEditing(false));
+                  }}
+                >
+                  <Field label="Rack / storage location">
+                    <input
+                      value={location}
+                      maxLength={120}
+                      placeholder="e.g. Rack B / slot 3"
+                      onChange={(e) => setLocation(e.target.value)}
+                    />
+                  </Field>
+                  <button className="button secondary" disabled={editing}>
+                    Save location
+                  </button>
+                  <p className="hint">
+                    Write or attach this stock ID to the physical sheet. Match
+                    the ID and location to the cutting plan before use.
+                  </p>
+                  <ErrorNotice message={stockError} />
+                </form>
+              )}
             </>
           )}
         </section>
       </div>
+      {reviewsOpen && (
+        <Modal
+          title="Recover pending geometry reviews"
+          onClose={() => {
+            setReviewsOpen(false);
+            setReview(null);
+            setStockError("");
+          }}
+        >
+          <p>
+            These completed analyses are stored on this workstation's backend.
+            Opening or accepting one does not call SAM again.
+          </p>
+          {reviewBusy && <Busy label={reviewBusy} />}
+          <ErrorNotice message={stockError} />
+          {!reviews.length && !reviewBusy && (
+            <p>No geometry reviews are waiting.</p>
+          )}
+          <div className="review-inbox">
+            {reviews.map((item) => (
+              <button
+                className="button secondary"
+                key={item.review_id}
+                disabled={!!reviewBusy}
+                onClick={() => {
+                  setReviewBusy("Loading saved geometry");
+                  setStockError("");
+                  void api
+                    .review(item.review_id)
+                    .then(setReview)
+                    .catch((e) => setStockError(e.message))
+                    .finally(() => setReviewBusy(""));
+                }}
+              >
+                {item.fields.sheet_id} · {item.fields.material} ·{" "}
+                {item.fields.thickness_mm} mm
+              </button>
+            ))}
+          </div>
+          {review && (
+            <GeometryReview
+              key={review.review_id}
+              result={review}
+              onAccepted={() => {
+                setReviews((old) =>
+                  old.filter((item) => item.review_id !== review.review_id),
+                );
+                setReview(null);
+                onRefresh();
+              }}
+              onRejected={() => {
+                setReviews((old) =>
+                  old.filter((item) => item.review_id !== review.review_id),
+                );
+                setReview(null);
+              }}
+            />
+          )}
+        </Modal>
+      )}
       {seedConfirm && (
         <Modal
           title="Load demonstration stock?"

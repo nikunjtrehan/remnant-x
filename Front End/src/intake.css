@@ -345,3 +345,55 @@
     font-size: 10px;
   }
 }
+.marker-check[data-missing="true"] {
+  background: #fff0eb;
+  border: 1px solid #b65d46;
+  color: #7f3525;
+}
+.marker-check[data-missing="true"] small {
+  color: #7f3525;
+}
+.geometry-review {
+  width: 100%;
+}
+.geometry-review > .notice {
+  margin: 14px 18px;
+}
+.geometry-review > .hint,
+.geometry-review > .review-confirm,
+.geometry-review > .action-row {
+  margin: 16px 18px;
+}
+.review-confirm {
+  padding: 14px;
+  border: 1px solid #b4c5a6;
+  border-radius: 8px;
+  background: #f4f7ed;
+}
+.review-confirm input {
+  flex-shrink: 0;
+}
+.review-inbox {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.modal:has(.geometry-review) {
+  max-width: 1050px;
+  width: calc(100% - 48px);
+}
+.stock-location {
+  margin: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #dde3d8;
+}
+.stock-pick {
+  margin: 0;
+  padding: 12px 20px;
+  background: #f1f5e9;
+  color: #304c39;
+  font-size: 12px;
+  line-height: 1.6;
+  border-bottom: 1px solid #dde3d8;
+}

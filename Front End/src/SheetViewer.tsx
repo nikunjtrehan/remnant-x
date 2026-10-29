@@ -10,6 +10,7 @@ import {
 } from "./geometry";
 
 interface Props {
+  photo?: { src: string; width: number; height: number };
   geometry?: Geometry;
   parts?: PlacedPart[];
   program?: Program;
@@ -23,6 +24,7 @@ interface Props {
 }
 const palette = ["#a2bc9c", "#d3aa83", "#a4bac4", "#c4bb83", "#b3a4c3"];
 export function SheetViewer({
+  photo,
   geometry,
   parts = [],
   program,
@@ -38,6 +40,7 @@ export function SheetViewer({
   const [zoom, setZoom] = useState(1),
     [pan, setPan] = useState<[number, number]>([0, 0]);
   const [showZone, setShowZone] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(true);
   const [drag, setDrag] = useState<{
     x: number;
     y: number;
@@ -62,6 +65,18 @@ export function SheetViewer({
           {geometry ? "PLAN VIEW · MILLIMETRES" : "GEOMETRY WORKSPACE"}
         </span>
         <div className="viewer-controls">
+          {photo && (
+            <button
+              type="button"
+              aria-label={
+                showPhoto ? "Hide rectified photo" : "Show rectified photo"
+              }
+              aria-pressed={showPhoto}
+              onClick={() => setShowPhoto((v) => !v)}
+            >
+              Photo
+            </button>
+          )}
           {zone && (
             <button
               className={showZone ? "icon-button active" : "icon-button"}
@@ -147,11 +162,21 @@ export function SheetViewer({
           height={h * 41}
           fill={`url(#${pattern})`}
         />
+        {photo && showPhoto && (
+          <image
+            href={photo.src}
+            x={0}
+            y={-photo.height}
+            width={photo.width}
+            height={photo.height}
+            preserveAspectRatio="none"
+          />
+        )}
         {geometry ? (
           <>
             <path
               d={geometryPath(geometry)}
-              fill="#e0e5db"
+              fill={photo && showPhoto ? "#a3d77a22" : "#e0e5db"}
               fillRule="evenodd"
               stroke="#5d6f58"
               strokeWidth={1.4}
@@ -161,7 +186,11 @@ export function SheetViewer({
               <path
                 key={i}
                 d={pointsPath(ring)}
-                fill={`url(#${pattern}-hatch)`}
+                fill={
+                  photo && showPhoto
+                    ? "transparent"
+                    : "url(#" + pattern + "-hatch)"
+                }
                 stroke="#96a18f"
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"

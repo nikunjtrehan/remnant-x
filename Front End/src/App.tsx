@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Boxes, Camera, ChevronRight, CircleHelp, LayoutGrid, Play, ScanLine, Settings2 } from 'lucide-react';
-import { SheetViewer } from './SheetViewer';
+import { Plan } from './Plan';
 import { Capture } from './Capture';
 import { Inventory } from './Inventory';
 import { api } from './api';
@@ -25,7 +25,7 @@ export default function App() {
     </aside>
     <main className="main"><header className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={13} /><span>{tab}</span></div><button className={`connection connection-button ${connected ? '' : 'offline'}`} onClick={() => void refresh()}><i />{connected ? 'Backend connected' : 'Backend offline · retry'}</button></header>
       <div className="page-heading"><div><p className="eyebrow">LESS SCRAP. MORE POSSIBILITY.</p><h1>{tab === 'Plan a job' ? <>The sheet you have.<br /><span>The parts you need.</span></> : tab === 'Scan a remnant' ? <>Start with what’s left.<br /><span>See what’s possible.</span></> : <>Useful material.<br /><span>Already in your workshop.</span></>}</h1><p>{tab === 'Plan a job' ? 'From a remnant to a verified cutting plan, in one workspace.' : tab === 'Scan a remnant' ? 'A station photograph becomes geometry. The holes come with it.' : 'Inspect your sheets, their cutouts and the space you can still use.'}</p></div><button className="button secondary" onClick={() => setGuide(true)}><Play size={15} />Workbench guide<ArrowUpRight size={15} /></button></div>
-      <div hidden={tab !== 'Plan a job'} className="workspace-grid"><section className="panel input-panel"><div className="panel-heading"><span className="step-number">01</span><div><h2>Your next job</h2><p>Tell us what you need to make.</p></div></div><label className="field-label" htmlFor="prompt">Manufacturing request</label><textarea id="prompt" placeholder="Cut 8 plates, 50 × 30 mm, from 3 mm steel. Kerf 1 mm." /><p className="hint">Order planning is the next milestone. Scan and inventory are connected.</p><button className="button primary full" onClick={() => setTab('Scan a remnant')}>Scan your first remnant <ChevronRight size={16} /></button></section><section className="panel canvas-panel"><div className="canvas-heading"><div><span className="eyebrow">SPATIAL WORKSPACE</span><h2>Room for your next idea.</h2></div><span className="badge neutral">Plan view</span></div><SheetViewer /><div className="canvas-caption"><span className="pulse-square" />Geometry stays in millimetres. Existing holes stay out of the cut.</div></section></div>
+      <div hidden={tab !== 'Plan a job'}><Plan inventory={inventory} onInventoryChanged={() => void refresh()} onInventory={() => setTab('Inventory')} example={false} /></div>
       <div hidden={tab !== 'Scan a remnant'}><Capture onSaved={() => void refresh()} /></div>
       <div hidden={tab !== 'Inventory'}><Inventory remnants={inventory} loading={loading} error={inventoryError} onRefresh={() => void refresh()} onScan={() => setTab('Scan a remnant')} example={false} /></div>
       <footer className="page-footer"><span>Built for the material that’s already here.</span><span>Perception → geometry → verified output</span></footer>

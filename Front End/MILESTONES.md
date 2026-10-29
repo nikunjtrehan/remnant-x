@@ -54,3 +54,17 @@ Results are added after each milestone passes its checks.
   and explicitly seed demo stock after a reset explanation.
 - No provider calls, private-photo publication or production-inventory changes
   are needed to verify this milestone.
+
+### Milestone 3
+
+- Prompt parsing has an editable structured review; vendor uploads keep per-file
+  errors and bind accepted files to explicit quantities without another model.
+- Per-sheet geometry, controller settings, final verification, G-code/result
+  downloads and predicted stock updates are connected to FastAPI.
+- Ten frontend checks pass, including exact grade retention, invalidating old
+  results after editing, partial-batch handling and upload-to-50 binding.
+- Browser validation used a separate `.task-tmp/frontend-dev` database: explicitly
+  loaded three demo sheets, planned eight rectangles through the actual endpoint,
+  saw 8/8 software-verified placements, then completed the explained replan/update
+  action. The application showed the newly returned result and updated stock.
+- No production warehouse changes or paid inference were used for these checks.

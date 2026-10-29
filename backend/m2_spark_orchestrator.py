@@ -422,7 +422,7 @@ class SparkWarehouseOrchestrator:
         # 1. Uploaded vendor DXF files mentioned in prompt (e.g. "50 of the uploaded dxf/gear")
         for dxf_file in uploaded_dxf_files or []:
             dxf_qty_match = re.search(
-                r"(\d+)\s*(?:x|pcs|pieces|units|quantity|of)?\s*(?:the\s+)?(?:uploaded|custom|dxf|cad|part|file|gear|bracket|plate)",
+                r"(\d+)\s*(?:x|(?:copies|pcs|pieces|units|quantity)(?:\s+of)?|of)?\s*(?:the\s+)?(?:uploaded|custom|dxf|cad|part|file|gear|bracket|plate)",
                 text,
             )
             if not dxf_qty_match:

@@ -1,6 +1,33 @@
 # Remnant X
 
-Backend prototype for photo → remnant inventory → manufacturing order → nesting → verified G-code. Meta SAM 3.1 supplies segmentation; model-assisted order parsing supplies structured requests; local geometry decides placement and verifies the generated program.
+Desktop workbench and backend prototype for photo → remnant inventory → manufacturing order → nesting → verified G-code. Meta SAM 3.1 supplies segmentation; model-assisted order parsing supplies structured requests; local geometry decides placement and verifies the generated program.
+
+## Desktop workbench
+
+The frontend lives in [Front End](Front%20End/README.md). It provides a recorded
+synthetic example with a guided visual walkthrough, a photo/scanner gate,
+inventory inspection, editable order review, multi-DXF quantities, per-sheet
+nesting views and verified downloads. Example mode never substitutes for a live
+request. The example uses actual offline backend output, not a live SAM result.
+
+Start the API using the Windows instructions below. In a second terminal, from
+the project root:
+
+```powershell
+Set-Location 'Front End'
+npm ci
+npm run dev
+```
+
+Open the printed local address, normally **http://127.0.0.1:5173**. Both processes
+must be running for live work. The recorded example works with the frontend alone.
+Provider credentials remain on the backend. Use Node 22.12 or newer.
+
+Frontend changes were developed as four local milestones; see the
+[milestone record](Front%20End/MILESTONES.md) and
+[validation notes](Front%20End/VALIDATION.md). The live inventory-update action is
+explicitly a replan followed by an atomic predicted-stock update; it does not
+claim to commit exactly the earlier preview or operate a machine.
 
 Read `backend/api.py` for HTTP routes and `backend/pipeline.py` for the manufacturing workflow. Public request types live in `schemas.py`; geometry/result conversion lives in `serialization.py`. The numbered modules retain the optical, order, nesting and G-code stages. The implemented classes are `HoleAwareNester` (NFP contact placement plus bounded simulated annealing) and `GCodeCompiler`; old Python names remain compatibility aliases. Baseten is the default order parser; Fireworks supplies transport failover and one guarded repair of a rejected complete-order extraction. Independent local nesting searches run in parallel; no three-cloud blackboard sits in the execution path.
 

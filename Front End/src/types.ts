@@ -146,6 +146,14 @@ export interface IndexResult {
   timings_ms: Record<string, number>;
   saved_remnant: Remnant | null;
 }
+export interface ScanFields {
+  sheet_id: string;
+  material: string;
+  thickness_mm: number;
+  segmentation_concept: string;
+  use_clahe: boolean;
+  segmentation_box_px?: number[];
+}
 export interface Upload {
   filename: string;
   dxf_path: string;

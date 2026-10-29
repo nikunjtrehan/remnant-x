@@ -11,7 +11,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { Plan } from "./Plan";
-import { Capture } from "./Capture";
+import { Scanner } from "./Scanner";
 import { ExampleTour } from "./ExampleTour";
 import { Inventory } from "./Inventory";
 import { api } from "./api";
@@ -182,19 +182,31 @@ export default function App() {
                   : "Inspect your sheets, their cutouts and the space you can still use."}
             </p>
           </div>
-          <button
-            className="button secondary"
-            disabled={!recording}
-            onClick={() => {
-              setExample(true);
-              setTab("Plan a job");
-              setTour(true);
-            }}
-          >
-            <Play size={15} />
-            {example ? "Guided walkthrough" : "Explore the example"}
-            <ArrowUpRight size={15} />
-          </button>
+          <div className="heading-actions">
+            <button
+              className="button primary"
+              onClick={() => {
+                setExample(false);
+                setTab("Scan a remnant");
+              }}
+            >
+              <ScanLine size={15} />
+              Import stock <span className="button-detail">Photos / ZIP</span>
+            </button>
+            <button
+              className="button secondary"
+              disabled={!recording}
+              onClick={() => {
+                setExample(true);
+                setTab("Plan a job");
+                setTour(true);
+              }}
+            >
+              <Play size={15} />
+              {example ? "Guided walkthrough" : "Explore the example"}
+              <ArrowUpRight size={15} />
+            </button>
+          </div>
         </div>
         <ErrorNotice message={example ? recordingError : ""} />
         <div hidden={tab !== "Plan a job"}>
@@ -224,7 +236,7 @@ export default function App() {
           )}
         </div>
         <div hidden={tab !== "Scan a remnant"}>
-          <Capture onSaved={() => void refresh()} />
+          <Scanner onSaved={() => void refresh()} />
         </div>
         <div hidden={tab !== "Inventory"}>
           <Inventory

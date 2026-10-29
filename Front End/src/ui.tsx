@@ -29,7 +29,7 @@ export function Busy({ label }: { label: string }) {
       <LoaderCircle className="spin" size={17} />
       <div>
         <strong>{label}</strong>
-        <small>{seconds}s elapsed · waiting for the backend</small>
+        <small>{seconds}s elapsed</small>
       </div>
     </div>
   );

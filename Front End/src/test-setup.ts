@@ -1,5 +1,7 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
+import { webcrypto } from "node:crypto";
+vi.stubGlobal("crypto", webcrypto);
 // Keep tests independent of Node 25's experimental filesystem-backed storage.
 const items = new Map<string, string>();
 vi.stubGlobal("localStorage", {

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   CheckCircle2,
@@ -14,31 +14,39 @@ import { SheetViewer } from "./SheetViewer";
 import { PhotoRegion } from "./PhotoRegion";
 import { Busy, ErrorNotice, Field, loadLocal } from "./ui";
 import { formatNumber } from "./geometry";
-import type { IndexResult, Preflight, Station } from "./types";
+import { defaultStation, validStation } from "./station";
+import type { IndexResult, Preflight, ScanFields, Station } from "./types";
 
-const defaultStation: Station = {
-  name: "Station 01",
-  top: 657,
-  bottom: 658,
-  left: 509,
-  right: 514,
-  marker: 48,
-};
-const validStation = (v: unknown): v is Station => {
-  if (!v || typeof v !== "object") return false;
-  const s = v as Station;
-  return (
-    typeof s.name === "string" &&
-    [s.top, s.bottom, s.left, s.right, s.marker].every(
-      (n) => Number.isFinite(n) && n > 0,
-    )
-  );
-};
 const locations = ["Top left", "Top right", "Bottom right", "Bottom left"];
 
-export function Capture({ onSaved }: { onSaved: () => void }) {
-  const [station, setStation] = useState(() =>
-    loadLocal("remnantx.station.v1", defaultStation, validStation),
+export interface CaptureBinding {
+  file: File;
+  fields: ScanFields;
+  station: Station;
+  check?: Preflight;
+  result?: IndexResult;
+  locked: boolean;
+  onFieldsChange: (fields: ScanFields) => void;
+  onStationChange: (station: Station) => void;
+  onChecked: (check: Preflight) => void;
+  onAnalyze: () => void;
+}
+export function Capture({
+  onSaved,
+  batch,
+  stationProfile,
+  onStationProfileChange,
+}: {
+  onSaved: () => void;
+  batch?: CaptureBinding;
+  stationProfile?: Station;
+  onStationProfileChange?: (station: Station) => void;
+}) {
+  const [station, setStation] = useState(
+    () =>
+      batch?.station ??
+      stationProfile ??
+      loadLocal("remnantx.station.v1", defaultStation, validStation),
   );
   const [image, setImage] = useState(""),
     [filename, setFilename] = useState("");
@@ -47,15 +55,21 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState("");
   const [sheetId, setSheetId] = useState(
-    () => `REM_${Date.now().toString(36).toUpperCase()}`,
+    () =>
+      batch?.fields.sheet_id ?? `REM_${Date.now().toString(36).toUpperCase()}`,
   );
-  const [material, setMaterial] = useState(""),
-    [thickness, setThickness] = useState(3);
-  const [concept, setConcept] = useState("sheet"),
-    [clahe, setClahe] = useState(false),
+  const [material, setMaterial] = useState(batch?.fields.material ?? ""),
+    [thickness, setThickness] = useState(batch?.fields.thickness_mm ?? 3);
+  const [concept, setConcept] = useState(
+      batch?.fields.segmentation_concept ?? "sheet",
+    ),
+    [clahe, setClahe] = useState(batch?.fields.use_clahe ?? false),
     [rectified, setRectified] = useState(false);
   const [regionEnabled, setRegionEnabled] = useState(false),
-    [box, setBox] = useState<number[] | null>(null);
+    [box, setBox] = useState<number[] | null>(
+      batch?.fields.segmentation_box_px ?? null,
+    );
+  const locked = !!busy || !!batch?.locked;
   const revision = useRef(0),
     photoInput = useRef<HTMLInputElement>(null);
   const check = async (photo: string, profile: Station, version: number) => {
@@ -64,6 +78,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
     try {
       const checked = await api.preflight(photo, profile);
       if (revision.current === version) setPreflight(checked);
+      if (revision.current === version) batch?.onChecked(checked);
     } catch (e) {
       if (revision.current === version) setError((e as Error).message);
     } finally {
@@ -79,7 +94,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
     setRectified(false);
     setImage("");
     setFilename("");
-    setBox(null);
+    setBox(batch?.fields.segmentation_box_px ?? null);
     setRegionEnabled(false);
     if (!/\.(png|jpe?g)$/i.test(file.name) || file.size > 20_000_000) {
       setError("Choose a JPEG or PNG photo under 20 MB.");
@@ -96,11 +111,45 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
       const photo = reader.result as string;
       setImage(photo);
       setFilename(file.name);
-      void check(photo, station, version);
+      if (batch?.check) {
+        setPreflight(batch.check);
+        setBusy("");
+      } else void check(photo, station, version);
     };
     reader.readAsDataURL(file);
   };
-  const updateStation = (next: Station) => {
+  useEffect(() => {
+    if (batch) void choosePhoto(batch.file);
+    return () => {
+      revision.current++;
+    };
+  }, [batch?.file]);
+  useEffect(() => {
+    if (
+      !batch?.result &&
+      (batch?.station ?? stationProfile) &&
+      JSON.stringify(batch?.station ?? stationProfile) !==
+        JSON.stringify(station)
+    )
+      updateStation((batch?.station ?? stationProfile)!, false);
+  }, [batch?.station, stationProfile]);
+  useEffect(() => {
+    if (batch) setPreflight(batch.check ?? null);
+  }, [batch?.check]);
+  useEffect(() => {
+    if (batch?.result) setResult(batch.result);
+  }, [batch?.result]);
+  useEffect(() => {
+    batch?.onFieldsChange({
+      sheet_id: sheetId,
+      material,
+      thickness_mm: thickness,
+      segmentation_concept: concept,
+      use_clahe: clahe,
+      ...(box ? { segmentation_box_px: box } : {}),
+    });
+  }, [sheetId, material, thickness, concept, clahe, box]);
+  const updateStation = (next: Station, notify = true) => {
     revision.current++;
     setStation(next);
     setPreflight(null);
@@ -109,6 +158,10 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
     setError("");
     setBox(null);
     setRegionEnabled(false);
+    if (notify) {
+      batch?.onStationChange(next);
+      onStationProfileChange?.(next);
+    }
     try {
       localStorage.setItem("remnantx.station.v1", JSON.stringify(next));
     } catch {
@@ -116,7 +169,11 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
     }
   };
   const analyze = async () => {
-    if (!preflight?.ready || busy) return;
+    if (!preflight?.ready || locked) return;
+    if (batch) {
+      batch.onAnalyze();
+      return;
+    }
     setBusy("SAM 3.1 is extracting the sheet and cutouts");
     setError("");
     try {
@@ -152,7 +209,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
             <span>{station.name}</span>
             <span className="mono">Edit setup</span>
           </summary>
-          <fieldset disabled={!!busy}>
+          <fieldset disabled={locked}>
             <Field label="Station name">
               <input
                 value={station.name}
@@ -198,28 +255,36 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
           accept=".jpg,.jpeg,.png"
           ref={photoInput}
           aria-label="Station photo"
-          disabled={!!busy}
+          disabled={locked}
           onChange={(e) => {
             void choosePhoto(e.target.files?.[0]);
             e.target.value = "";
           }}
         />
-        <button
-          className="photo-drop"
-          disabled={!!busy}
-          onClick={() => photoInput.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            void choosePhoto(e.dataTransfer.files[0]);
-          }}
-        >
-          <UploadCloud size={27} />
-          <strong>
-            {image ? "Replace photograph" : "Choose a station photo"}
-          </strong>
-          <span>{filename || "Drop a JPEG or PNG · up to 20 MB"}</span>
-        </button>
+        {!batch && (
+          <button
+            className="photo-drop"
+            disabled={locked}
+            onClick={() => photoInput.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              void choosePhoto(e.dataTransfer.files[0]);
+            }}
+          >
+            <UploadCloud size={27} />
+            <strong>
+              {image ? "Replace photograph" : "Choose a station photo"}
+            </strong>
+            <span>{filename || "Drop a JPEG or PNG · up to 20 MB"}</span>
+          </button>
+        )}
+        {batch && (
+          <div className="batch-inspector-label">
+            <span className="eyebrow">SELECTED PHOTO</span>
+            <strong>{filename || batch.file.name}</strong>
+          </div>
+        )}
         <div className="marker-checklist">
           {locations.map((location, id) => {
             const found =
@@ -282,7 +347,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
           <div className="region-controls">
             <button
               className="text-button"
-              disabled={!!busy}
+              disabled={locked}
               onClick={() => {
                 setRectified(true);
                 setRegionEnabled((v) => !v);
@@ -296,7 +361,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
             {box && (
               <button
                 className="text-button"
-                disabled={!!busy}
+                disabled={locked}
                 onClick={() => setBox(null)}
               >
                 Clear region
@@ -317,7 +382,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
             void analyze();
           }}
         >
-          <fieldset disabled={!!busy || !!result}>
+          <fieldset disabled={locked || !!result}>
             <div className="divider" />
             <Field label="Inventory ID">
               <input
@@ -372,7 +437,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
             </p>
             <button
               className="button primary full"
-              disabled={!preflight?.ready || !!busy || !!result}
+              disabled={!preflight?.ready || locked || !!result}
               type="submit"
             >
               <ScanLine size={15} />
@@ -391,18 +456,20 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
                 {result.saved_remnant?.sheet_id} · {result.hole_count} cutout
                 {result.hole_count === 1 ? "" : "s"} preserved
               </p>
-              <button
-                className="text-button"
-                onClick={() => {
-                  setResult(null);
-                  setSheetId(`REM_${Date.now().toString(36).toUpperCase()}`);
-                  setImage("");
-                  setPreflight(null);
-                  setFilename("");
-                }}
-              >
-                Scan another remnant →
-              </button>
+              {!batch && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setResult(null);
+                    setSheetId(`REM_${Date.now().toString(36).toUpperCase()}`);
+                    setImage("");
+                    setPreflight(null);
+                    setFilename("");
+                  }}
+                >
+                  Scan another remnant →
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -422,7 +489,14 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
             </h2>
           </div>
           <span className="badge neutral">
-            {result ? "SAM 3.1" : "Live capture"}
+            {result
+              ? result.saved_remnant?.inventory_source === "sam"
+                ? "SAM 3.1"
+                : (result.saved_remnant?.inventory_source?.replaceAll(
+                    "_",
+                    " ",
+                  ) ?? "Indexed geometry")
+              : "Live capture"}
           </span>
         </div>
         {result ? (
@@ -536,7 +610,7 @@ export function Capture({ onSaved }: { onSaved: () => void }) {
                 <PhotoRegion
                   width={preflight.frame.width_px}
                   height={preflight.frame.height_px}
-                  enabled={regionEnabled && !busy}
+                  enabled={regionEnabled && !locked}
                   box={box}
                   onChange={setBox}
                 />

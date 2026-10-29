@@ -6,6 +6,7 @@ import type {
   Preflight,
   ProcessSettings,
   Remnant,
+  ScanFields,
   Station,
   Upload,
 } from "./types";
@@ -64,18 +65,7 @@ export const api = {
       image_base64: image,
       ...stationPayload(station),
     }),
-  index: (
-    image: string,
-    station: Station,
-    fields: {
-      sheet_id: string;
-      material: string;
-      thickness_mm: number;
-      segmentation_concept: string;
-      use_clahe: boolean;
-      segmentation_box_px?: number[];
-    },
-  ) =>
+  index: (image: string, station: Station, fields: ScanFields) =>
     request<IndexResult>("index-remnant", {
       image_base64: image,
       ...stationPayload(station),

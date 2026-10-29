@@ -1,0 +1,347 @@
+.scan-mode {
+  width: max-content;
+  margin-bottom: 22px;
+  gap: 6px;
+  background: #eaf0e2;
+  border: 1px solid #dae4cf;
+}
+.scan-mode > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 17px;
+  font-size: 13px;
+}
+.batch-panel {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.batch-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 21px;
+}
+.batch-heading h2 {
+  font-size: 23px;
+  font-weight: 550;
+  letter-spacing: -0.7px;
+  margin: 8px 0;
+}
+.batch-heading p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #5e7055;
+}
+.batch-start {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(380px, 1.7fr);
+  gap: 22px;
+  align-items: center;
+}
+.batch-drop {
+  border: 1px dashed #9daf8b;
+  border-radius: 7px;
+  background: #f3f8e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 98px;
+  width: 100%;
+  padding: 15px;
+  color: #52713e;
+  text-align: left;
+}
+.batch-drop > span {
+  flex: 1;
+}
+.batch-drop strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.batch-drop small {
+  font-size: 11px;
+  color: #61754e;
+  margin-top: 9px;
+  line-height: 1.6;
+}
+.batch-defaults {
+  display: grid;
+  grid-template-columns: 1fr 115px;
+  gap: 0 12px;
+}
+.batch-defaults .form-field {
+  margin-bottom: 8px;
+}
+.batch-defaults > .button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-height: 32px;
+  padding-block: 6px;
+}
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-block: 1px solid var(--line);
+  margin: 20px 0 16px;
+  padding: 14px 0;
+}
+.batch-counts {
+  font-size: 12px;
+  color: #4d6740;
+  line-height: 1.7;
+}
+.batch-actions > .text-button {
+  margin-left: auto;
+}
+.batch-queue {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  max-height: 270px;
+  overflow: auto;
+  padding: 3px;
+}
+.batch-row {
+  display: flex;
+  border: 1px solid #dce5d2;
+  border-radius: 7px;
+  background: #fafcf6;
+  align-items: center;
+  min-width: 0;
+}
+.batch-row.selected {
+  border-color: #8cab70;
+  background: #eef6e4;
+  box-shadow: inset 2px 0 #76965a;
+}
+.batch-select {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  min-width: 0;
+}
+.batch-select > img {
+  height: 54px;
+  width: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.batch-select > span {
+  flex: 1;
+  min-width: 0;
+}
+.batch-select strong {
+  font-size: 12px;
+  font-weight: 500;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.batch-select small {
+  font-size: 11px;
+  color: #60744f;
+  margin: 6px 0;
+}
+.batch-status {
+  font-size: 10px;
+  color: #647858;
+  display: inline-block;
+  line-height: 1.5;
+}
+.status-added,
+.status-ready {
+  color: #336c32;
+}
+.status-blocked,
+.status-error {
+  color: #a14e2d;
+}
+.status-indexing,
+.status-checking {
+  color: #5c6e37;
+}
+.batch-row-actions {
+  display: flex;
+  flex-direction: column;
+  padding-right: 5px;
+}
+.batch-inspector-label {
+  border: 1px solid #dfe7d6;
+  border-radius: 6px;
+  background: #f6f9f0;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.batch-inspector-label strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.heading-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.button-detail {
+  border-left: 1px solid #ffffff38;
+  padding-left: 8px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.result-summary {
+  font-size: 11px;
+  color: #536b44;
+  line-height: 1.8;
+  margin-top: 9px;
+}
+.upload-prompt-link {
+  font-size: 12px;
+  margin-top: 9px;
+}
+.app-shell {
+  --muted: #586b50;
+}
+.app-shell .hint,
+.app-shell .muted,
+.app-shell .panel-heading p,
+.app-shell .page-heading p:not(.eyebrow),
+.app-shell .contract-note,
+.app-shell .canvas-caption,
+.app-shell .stock-row small,
+.app-shell .part-editor-title small,
+.app-shell .example-parts small,
+.app-shell .example-spec small,
+.app-shell .viewer-footer {
+  color: #5e6f54;
+}
+.app-shell .form-field,
+.app-shell .field-label {
+  font-size: 12px;
+}
+.app-shell .form-field input,
+.app-shell .form-field select,
+.app-shell textarea {
+  font-size: 13px;
+}
+.app-shell .hint,
+.app-shell .panel-heading p,
+.app-shell .contract-note,
+.app-shell .checkbox-label {
+  font-size: 12px;
+}
+.app-shell .eyebrow {
+  color: #5a6e4b;
+  font-size: 10px;
+}
+.app-shell .part-fields .form-field {
+  font-size: 11px;
+}
+.app-shell .part-fields input {
+  font-size: 13px;
+}
+.app-shell .muted,
+.app-shell .part-editor-title small,
+.app-shell .example-spec small,
+.app-shell .example-parts small {
+  font-size: 11px;
+}
+.app-shell .viewer-footer {
+  font-size: 10px;
+}
+.app-shell .photo-tabs button,
+.app-shell .stock-availability,
+.app-shell .text-button {
+  font-size: 12px;
+}
+.app-shell .marker-check {
+  font-size: 11px;
+}
+.app-shell .marker-check small {
+  font-size: 10px;
+  color: #5b7049;
+}
+.app-shell .badge.neutral {
+  color: #526945;
+}
+.app-shell .example-note p,
+.app-shell .example-photo-card small,
+.app-shell .connection {
+  color: #596f48;
+}
+.app-shell .metric-strip > div > span {
+  color: #526a43;
+  font-size: 11px;
+}
+.tour-story > p,
+.tour-note,
+.tour-visual figcaption {
+  color: #5b6f4e;
+  font-size: 12px;
+}
+.tour-steps > button {
+  color: #60754e;
+  font-size: 11px;
+}
+.app-shell .topbar-actions .mode-switch > button {
+  color: #586e48;
+  font-size: 11px;
+}
+.app-shell .photo-drop > span {
+  color: #5b724b;
+  font-size: 11px;
+}
+.app-shell .photo-empty p {
+  color: #5b714b;
+  font-size: 12px;
+}
+.app-shell .check-row {
+  color: #5e714e;
+  font-size: 12px;
+}
+.app-shell .verification-panel > p {
+  color: #5e714e;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.app-shell input::placeholder,
+.app-shell textarea::placeholder {
+  color: #6c7a61;
+}
+@media (max-width: 1100px) {
+  .batch-queue {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .batch-start {
+    grid-template-columns: 1fr;
+  }
+  .batch-defaults {
+    grid-template-columns: 1fr 130px auto;
+    gap: 12px;
+    align-items: end;
+  }
+  .batch-defaults > .button {
+    grid-column: auto;
+    margin-bottom: 8px;
+  }
+  .heading-actions .button {
+    font-size: 11px;
+  }
+  .result-summary {
+    font-size: 10px;
+  }
+}

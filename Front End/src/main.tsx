@@ -5,6 +5,7 @@ import "./styles.css";
 import "./workflows.css";
 import "./planning.css";
 import "./example.css";
+import "./intake.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

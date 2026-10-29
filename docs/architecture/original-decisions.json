@@ -1,0 +1,289 @@
+[
+  {
+    "id": "F01",
+    "title": "Build a manufacturing workflow beyond a chat response",
+    "problem": "A photograph plus a chatbot answer does not manage stock, allocate a batch across remnants, or produce checked manufacturing output.",
+    "choice": "Connect physical indexing, persistent inventory, customer orders, nesting and verified output into one workflow.",
+    "alternative": "A standalone image-analysis chatbot or a repackaged winner project.",
+    "reason": "The value comes from working across persistent physical and digital state, not from an impressive isolated model answer.",
+    "status": "Backend workflow implemented; physical station acceptance and frontend demonstration remain pending.",
+    "evidence": [
+      "../../README.md",
+      "../../backend/pipeline.py"
+    ]
+  },
+  {
+    "id": "F02",
+    "title": "Borrow Recover-AI's hot-path / cold-path separation",
+    "problem": "Generating thousands of numeric coordinates through a model would add latency and opportunities for changed or invented values.",
+    "choice": "Let AI perceive and interpret; keep repeated coordinate calculations, nesting, emission and verification in ordinary local code. The original proposal also placed AI-authored compiler preparation outside the numeric loop.",
+    "alternative": "Have an LLM generate every toolpath coordinate or run a multi-agent discussion inside the numerical placement loop.",
+    "reason": "Adapt the earlier Recover-AI separation of uncertain preparation from repeatable execution.",
+    "status": "Numeric planning and verification run locally. Real Muse Code now prepares bounded GRBL and LinuxCNC emitters offline; validated emitters are reused without a coding-agent call for each job. SAM and order interpretation remain interactive cloud calls.",
+    "evidence": [
+      "../../backend/postprocessor.py",
+      "../../scripts/prepare_postprocessor.py"
+    ]
+  },
+  {
+    "id": "F03",
+    "title": "Require meaningful AI integration and reject sponsor-driven additions",
+    "problem": "Adding infrastructure merely because a sponsor offers it can distract from the application promise.",
+    "choice": "Use models where they perform necessary perception or language interpretation; judge additional services against the actual manufacturing workflow.",
+    "alternative": "Force Open Compute Project rack hardware or extra cloud services into the demo solely for brand alignment.",
+    "reason": "Each service should advance capture, interpretation or verified manufacturing rather than add unrelated infrastructure.",
+    "status": "Real SAM, Muse Spark Open parsing and Muse Code-prepared controller emitters are implemented. The backend does not add sponsor services solely to create traffic; physical accuracy and process qualification remain unproven.",
+    "evidence": [
+      "../../backend/sam_client.py",
+      "../../backend/m2_spark_orchestrator.py"
+    ]
+  },
+  {
+    "id": "F04",
+    "title": "Use a dedicated ArUco indexing station instead of loose A4 calibration",
+    "problem": "A loose reference can curl, be obscured, or be difficult to distinguish; a small calibration mat does not define a convenient capture area for larger remnants.",
+    "choice": "Fix four identifiable markers around a measured, flat station; place the remnant inside the visible markers.",
+    "alternative": "Assume a loose A4 page, debit card, or automatically detected paper edge is a sufficient factory workflow.",
+    "reason": "The user chose a repeatable station that a worker can set up once, rather than requiring ad hoc reference placement for every piece.",
+    "status": "Four-marker calibration is implemented. This project choice does not mean that every possible A4-based calibration method is mathematically invalid.",
+    "evidence": [
+      "../../backend/m1_sam_indexer.py",
+      "PHYSICAL_VALIDATION.md"
+    ]
+  },
+  {
+    "id": "F05",
+    "title": "Ask for measured station spans and marker size",
+    "problem": "Printed markers alone do not tell the software the physical distances between them; printer scaling and incorrect setup values can change metric scale.",
+    "choice": "Collect station width, height and the measured black marker-square size, with fixed marker identities and corner conventions.",
+    "alternative": "Assume nominal A4 dimensions or a printer's nominal scale establish exact physical measurements.",
+    "reason": "Measured reference geometry establishes pixel-to-millimeter scale and provides internal consistency checks.",
+    "status": "Implemented with marker residual checks. Those checks use the same reference setup and do not independently prove real-sheet accuracy.",
+    "evidence": [
+      "../../backend/m1_sam_indexer.py",
+      "../../backend/tests/test_module1_calibration.py"
+    ]
+  },
+  {
+    "id": "F06",
+    "title": "Make physical SOPs and cheap replaceable markers part of the product",
+    "problem": "Glare, shadows, obscured markers and inconsistent setup cannot all be repaired by asking AI to try harder.",
+    "choice": "Document a flat station, matte contrasting backing, visible white-bordered markers, measured dimensions and spare marker sets.",
+    "alternative": "Advertise unrestricted photographs in arbitrary environments as a reliable measurement system.",
+    "reason": "The user explicitly preferred replacing an inexpensive marker over risking a badly cut part, and wanted the operating conditions visible to reviewers and operators.",
+    "status": "Station assumptions and marker visibility checks are documented/implemented. The original 60–70 degree suggestion is a proposed capture practice, not a calibrated angle measurement or a guarantee of glare removal; real-station validation is pending.",
+    "evidence": [
+      "PHYSICAL_VALIDATION.md",
+      "../../README.md"
+    ]
+  },
+  {
+    "id": "F07",
+    "title": "Stay within flat 2D sheet stock",
+    "problem": "A curved bucket or bent beam needs surface geometry and machine capabilities beyond a planar photograph and flatbed nesting.",
+    "choice": "Constrain this product to flat sheet remnants and 2D part outlines; keep material and thickness as explicit supplied specifications.",
+    "alternative": "Expand into 360-degree video reconstruction, arbitrary 3D scrap and robotic multi-axis cutting.",
+    "reason": "The scope follows the original 2D fabrication use case and avoids adding a different sensing, fixturing and machining problem.",
+    "status": "2D scope retained. Segmentation does not establish material grade or thickness, and synthetic tests do not qualify a real cutting process.",
+    "evidence": [
+      "../../backend/schemas.py",
+      "../../README.md"
+    ]
+  },
+  {
+    "id": "F08",
+    "title": "Represent actual usable material, including holes",
+    "problem": "A bounding rectangle treats an existing hole as usable stock and hides the product's main manufacturing constraint.",
+    "choice": "Preserve outer boundaries, interior voids and the solid area left after placements.",
+    "alternative": "Treat every remnant or part as a filled rectangle or let a model invent coordinates around holes.",
+    "reason": "The shape of usable material is the essential state that makes remnant reuse possible.",
+    "status": "Implemented with polygons and holes. A supplied polygon can be checked accurately while its match to the physical sheet remains unproven.",
+    "evidence": [
+      "../../backend/m1_sam_indexer.py",
+      "../../backend/db_and_parts.py"
+    ]
+  },
+  {
+    "id": "F09",
+    "title": "Keep language orders and vendor CAD on one part-specification path",
+    "problem": "Simple circles are easy to describe, while a custom vendor part cannot safely be recreated from a vague description.",
+    "choice": "Support both parametric shapes described in a prompt and uploaded DXF geometry with explicit quantities, feeding the same batch workflow.",
+    "alternative": "Require CAD for every simple shape, or silently approximate a complex uploaded part with a circle or rectangle.",
+    "reason": "The user repeatedly required both simple prompts and 'make 50 of this uploaded part', including mixed orders.",
+    "status": "Backend supports both paths. DXF support is deliberately bounded; arbitrary curves, blocks and 3D CAD are not accepted.",
+    "evidence": [
+      "../../backend/api.py",
+      "../../backend/tests/test_promise_acceptance.py"
+    ]
+  },
+  {
+    "id": "F10",
+    "title": "Reuse inventory state instead of rescanning after every planned cut",
+    "problem": "Repeatedly carrying a remnant to the station and photographing it after every job creates operator work.",
+    "choice": "Persist stock geometry and explicitly subtract planned consumed material when the operator commits the job.",
+    "alternative": "Discard the remnant record after one use or require a new photograph for every known cut.",
+    "reason": "The system already knows the planned cut locations and can maintain a useful remnant lifecycle.",
+    "status": "Implemented with atomic batch updates and stale-state checks. Updates describe predicted post-cut stock, not confirmed physical cutting; moved or changed stock needs appropriate reindexing and registration.",
+    "evidence": [
+      "../../backend/db_and_parts.py",
+      "../../backend/tests/test_safety_regressions.py"
+    ]
+  },
+  {
+    "id": "F11",
+    "title": "Match compatible stock, then prefer smaller remnants",
+    "problem": "Using a large compatible sheet for a tiny order can preserve awkward scraps while consuming more flexible stock.",
+    "choice": "Filter on exact material and thickness, then try smaller usable remnants first.",
+    "alternative": "Pick the first database row or equate every steel/alloy grade.",
+    "reason": "The policy reflects warehouse reuse priorities, not just geometric fit.",
+    "status": "Implemented as a heuristic with exact conservative material identities. Smallest-first is not a proof of globally optimal stock usage.",
+    "evidence": [
+      "../../backend/m2_spark_orchestrator.py",
+      "../../backend/m3_nfp_nester.py"
+    ]
+  },
+  {
+    "id": "F12",
+    "title": "Spill across sheets while backfilling smaller parts",
+    "problem": "A large part failing to fit does not mean the remaining gaps are useless for smaller parts.",
+    "choice": "Continue testing smaller items on the current sheet while carrying unplaced items into subsequent sheets.",
+    "alternative": "Stop a sheet at the first failed placement or require one sheet to hold the entire order.",
+    "reason": "Batch orders and mixed part sizes were explicit operator scenarios, not optional decorative features.",
+    "status": "Implemented; partial previews can be shown, while partial orders cannot commit inventory.",
+    "evidence": [
+      "../../backend/m3_nfp_nester.py",
+      "../../backend/tests/test_module3_nester.py"
+    ]
+  },
+  {
+    "id": "F13",
+    "title": "Reuse ring centers and preserve physical cutting order",
+    "problem": "The center of a new ring can supply smaller parts, but releasing surrounding material too soon can undermine the planned cut sequence.",
+    "choice": "Preserve reusable interior solid regions during nesting and order nested/internal cuts before their enclosing contours.",
+    "alternative": "Throw away every ring center or emit contours in an arbitrary order.",
+    "reason": "The reuse policy and cutting hierarchy need to work together.",
+    "status": "Hole reuse and inside-out ordering are implemented and tested against planned geometry. Workholding and physical part movement remain process-qualification concerns.",
+    "evidence": [
+      "../../backend/tests/test_module3_nester.py",
+      "../../backend/m4_muse_gcode.py"
+    ]
+  },
+  {
+    "id": "F14",
+    "title": "Treat grain and physical origin as manufacturing constraints",
+    "problem": "An attractive layout may violate grain requirements or provide coordinates that an operator cannot register on the machine.",
+    "choice": "Restrict rotations for grain-locked parts and identify a physical sheet reference vertex for the work origin.",
+    "alternative": "Allow every rotation and assume the camera station origin automatically transfers to the cutting bed.",
+    "reason": "The design must be understandable to the operator moving a real remnant between stations.",
+    "status": "Rotation locks and a physical origin vertex are implemented. One reference point alone does not establish sheet orientation or fixturing after movement; machine registration remains a physical SOP.",
+    "evidence": [
+      "../../backend/m3_nfp_nester.py",
+      "../../backend/m4_muse_gcode.py"
+    ]
+  },
+  {
+    "id": "F15",
+    "title": "Use an embedded inventory and keep iterative geometry in memory",
+    "problem": "A small local warehouse and a tight placement loop do not automatically require a database service or network spatial calls.",
+    "choice": "Use SQLite for inventory transactions and scalar filtering; load candidate polygons into local geometry libraries for iterative calculations.",
+    "alternative": "Introduce cloud-database dependencies or route every placement collision test through a database connection.",
+    "reason": "Reduce setup and operational dependencies for the local prototype while keeping the workload easy to inspect.",
+    "status": "Implemented. This is a workload-specific choice, not a claim that SQLite universally outperforms other databases or that live AI indexing works offline.",
+    "evidence": [
+      "../../backend/db_and_parts.py",
+      "../../backend/pipeline.py"
+    ]
+  },
+  {
+    "id": "F16",
+    "title": "Use physical photos and generated CAD fixtures without a training project",
+    "problem": "A downloaded image without known reference geometry cannot establish metric accuracy; collecting training data can become a separate project.",
+    "choice": "Use pretrained segmentation, measured photographs of the actual station, and CAD parts with known dimensions. Generate simple fixtures locally where appropriate.",
+    "alternative": "Train a new model or make internet photo collection a prerequisite for proving the core workflow.",
+    "reason": "The user explicitly accepted self-contained phone/cardboard trials and generated part files instead of unnecessary dataset hunting.",
+    "status": "Synthetic fixtures and real SAM connectivity have been tested. The actual measured cardboard/station acceptance remains pending; generated fixtures are not represented as third-party vendor data.",
+    "evidence": [
+      "PHYSICAL_VALIDATION_20261029.md",
+      "../../backend/tests/test_promise_acceptance.py"
+    ]
+  },
+  {
+    "id": "F17",
+    "title": "Design a two-sided workbench rather than a chat-only UI",
+    "problem": "Operators index stock, while order planning requires parts, quantities and multiple sheet layouts; one chat transcript obscures that state.",
+    "choice": "Provide a scanner/inventory side and a nesting/order side with sheet tabs, geometry overlays, buffers and a toolpath view.",
+    "alternative": "Hide the manufacturing workflow behind conversational text and a single spinner.",
+    "reason": "Users should inspect what the software inferred and planned, including where holes and parts actually are.",
+    "status": "API foundations exist; the two-sided frontend, progressive events and simulator remain planned, not completed features.",
+    "evidence": [
+      "../../README.md",
+      "../../backend/schemas.py"
+    ]
+  },
+  {
+    "id": "F18",
+    "title": "Make demonstrations reproducible and label their provenance",
+    "problem": "A reviewer may lack a camera, a suitable CAD file or live model credentials; silently replacing live behavior would misrepresent the result.",
+    "choice": "Provide explicit demonstration inputs and separate them from real stock, along with reproducible deterministic checks and honest limits.",
+    "alternative": "Require extensive setup for every first run or report cached/threshold-derived geometry as live SAM output.",
+    "reason": "Demonstrations must be reproducible and distinguish live perception from synthetic inputs.",
+    "status": "Explicit demo seeding and local-threshold provenance are implemented. A polished preloaded zero-login frontend and cached-SAM replay experience remain planned.",
+    "evidence": [
+      "../../backend/api.py",
+      "../../backend/tests/test_safety_regressions.py"
+    ]
+  },
+  {
+    "id": "F19",
+    "title": "Choose simple responsibilities and verify each stage",
+    "problem": "More frameworks and files do not establish correctness or make the project easier to understand.",
+    "choice": "Use a small local backend, explicit model/math boundaries, standard geometry libraries and stage/integration tests; build the independent local core before connecting real APIs.",
+    "alternative": "Microservice sprawl, writing geometry primitives from scratch, or labelling mocked masks and hand-written orders as evidence of live AI integration.",
+    "reason": "Standard local responsibilities and stage checks keep the workflow understandable and testable.",
+    "status": "One nesting module now computes hole-aware NFP contact placements and bounded, seeded parallel simulated annealing. Independent geometry and final-program checks remain mandatory. Search budgets and double precision limit the result; no global-optimality claim is made.",
+    "evidence": [
+      "REPOSITORY_AUDIT.md",
+      "../../backend/tests/test_nfp_search.py"
+    ]
+  },
+  {
+    "id": "F20",
+    "title": "Keep an architectural decision and SOP website",
+    "problem": "A code inventory does not explain why a station, scope boundary, database or workflow was chosen.",
+    "choice": "Maintain a static record of the problem, alternatives, choice, rationale, evidence and limitations, alongside physical SOPs.",
+    "alternative": "Leave rationale scattered through chats or describe only recent implementation edits.",
+    "reason": "Architectural choices and physical SOPs need a reviewable record with evidence and limitations.",
+    "status": "The local static record includes founding decisions, physical validation protocol, current application audit and compact benchmark case tables, with full normalized evidence in a separate gzip download. It is not publicly deployed.",
+    "evidence": [
+      "index.html",
+      "PHYSICAL_VALIDATION.md"
+    ]
+  },
+  {
+    "id": "F21",
+    "title": "Evaluate parallel cloud specialization instead of assuming it is faster",
+    "problem": "The user wanted Baseten, Fireworks and Meta to do useful work rather than sit in a fallback tier, but peer-to-peer model conversations and slow workers can add delay.",
+    "choice": "Explore independent structured tasks coordinated by ordinary code, then judge the policy using measured latency, failures, correctness and usage.",
+    "alternative": "Assume more providers guarantee better answers or a fixed response deadline.",
+    "reason": "The 120-trial comparison measured 50/60 versus 51/60 correct outcomes at 3.23 versus 18.73 seconds median; additional inference must justify its delay and cost.",
+    "status": "Primary-first routing remains the default. Missing-input/contradiction guards are implemented. Fireworks can make one grounded repair of a rejected complete-order extraction; the same deterministic guards must accept it. Parallel order agreement remains experimental. NFP search chains perform useful parallel local computation; the three-role blackboard is absent.",
+    "evidence": [
+      "DECISION.md",
+      "benchmark.json",
+      "../../backend/m2_spark_orchestrator.py"
+    ]
+  },
+  {
+    "id": "F22",
+    "title": "Validate photo-derived geometry against independent physical measurements",
+    "problem": "Correct nesting against a detected mask does not prove that the mask matches the physical remnant. Asking operators to describe every existing hole would defeat the photo-indexing workflow.",
+    "choice": "Use separately measured cardboard outlines and cutouts as validation ground truth. Process the photo using station calibration and SAM without supplying the remnant measurements to geometry extraction, then compare the inferred geometry with the physical measurements.",
+    "alternative": "Treat mask consistency as physical accuracy, or require workers to measure and enter every existing boundary and hole during routine indexing.",
+    "reason": "Station measurements establish metric scale; independent remnant measurements test whether perception and calibration recover the actual usable material. Production indexing should require a calibrated photo, material identity and thickness, not manually entered existing-hole dimensions.",
+    "status": "First physical capture tested on 29 October 2026. Calibrated real SAM recovered one sheet and one L-shaped hole without cleanup. User physical remeasurement corrected the hole-offset references to 73/69 mm top/left; baseline extraction is 73.46/68.65 mm without adjustment. Exterior errors still reach 4.7 mm; overall accuracy acceptance and repeatability across captures remain open. Isolated downstream orders, verified output and predicted inventory commits passed; real inventory was unchanged. Latest offline suite: 167 tests. See PHYSICAL_VALIDATION_20261029.md.",
+    "evidence": [
+      "PHYSICAL_VALIDATION_20261029.md",
+      "PHYSICAL_VALIDATION.md"
+    ]
+  }
+]

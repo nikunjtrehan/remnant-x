@@ -1,12 +1,32 @@
 from dataclasses import dataclass, field
 import math
 import re
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from shapely import affinity
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, Polygon
 
 from backend.llm_client import LiveModelClient
-from backend.m3_nfp_nester import PlacedPartInstance, SheetNestingOutcome
+from backend.m3_nfp_nester import PlacedPartInstance
+from backend.postprocessor import emit_prepared
+
+
+def arc_points(start, end, center, clockwise):
+    """Bounded XY centre-format arc, sampled at <=0.5 degrees for verification."""
+    radius = math.dist(start, center)
+    if not 0.01 <= radius <= 10000 or abs(radius - math.dist(end, center)) > 0.002:
+        raise ValueError("ERR_ARC_RADIUS")
+    a0 = math.atan2(start[1] - center[1], start[0] - center[0])
+    a1 = math.atan2(end[1] - center[1], end[0] - center[0])
+    sweep = ((a0 - a1) if clockwise else (a1 - a0)) % (2 * math.pi)
+    if not 1e-8 < sweep <= math.pi + 1e-8:
+        raise ValueError("ERR_ARC_SWEEP: supported arcs are nonzero and at most 180 degrees")
+    steps = max(1, math.ceil(round(sweep / (math.pi / 360), 9)))
+    direction = -1 if clockwise else 1
+    points = [start] + [(center[0] + radius * math.cos(a0 + direction * sweep * i / steps),
+                         center[1] + radius * math.sin(a0 + direction * sweep * i / steps))
+                        for i in range(1, steps)] + [end]
+    error_bound = radius * (1 - math.cos(sweep / (2 * steps))) + 0.002
+    return points, radius * sweep, error_bound
 
 
 @dataclass
@@ -16,6 +36,12 @@ class CutLoopSegment:
     loop_type: str  # "INTERNAL_HOLE" or "OUTER_PERIMETER"
     coords_mm: List[Tuple[float, float]]
     closed_polygon: Polygon
+    lead_in: Optional[Dict[str, Any]] = None
+    process: Dict[str, float] = field(default_factory=dict)
+
+    @property
+    def expected_cut_coords(self):
+        return self.lead_in["points"][:-1] + self.coords_mm if self.lead_in else self.coords_mm
 
 
 @dataclass
@@ -44,8 +70,8 @@ class CompiledSheetGCode:
 class GCodeCompiler:
     """Module 4: CNC G-Code Compiler, Inside-Out Sequencer & Toolpath Verifier.
 
-    Emits a bounded GRBL 1.1 laser profile and independently checks its geometry.
-    Machine process settings require operator qualification; models do not emit opcodes.
+    Plans numeric paths locally, formats them with prepared controller emitters,
+    and independently verifies the final text. Process settings need qualification.
     """
 
     def __init__(
@@ -54,11 +80,13 @@ class GCodeCompiler:
         pierce_delay_sec: float = 0.4,
         laser_power_s: int = 1000,
         llm_client: Optional[LiveModelClient] = None,
+        lead_in_radius_mm: float = 0.0,
     ):
         self.cut_feedrate_mm_min = float(cut_feedrate_mm_min)
         self.pierce_delay_sec = float(pierce_delay_sec)
         self.laser_power_s = int(laser_power_s)
-        self.llm = llm_client  # Accepted for compatibility; compilation never calls a model.
+        self.llm = llm_client  # Code generation is a separate preparation step.
+        self.lead_in_radius_mm = float(lead_in_radius_mm)
         self.last_llm_trace: Dict[str, Any] = {}
         if not math.isfinite(self.cut_feedrate_mm_min) or self.cut_feedrate_mm_min <= 0:
             raise ValueError("ERR_INVALID_FEEDRATE")
@@ -66,6 +94,8 @@ class GCodeCompiler:
             raise ValueError("ERR_INVALID_DWELL")
         if not 1 <= self.laser_power_s <= 1000:
             raise ValueError("ERR_INVALID_POWER: profile requires S in 1..1000")
+        if not math.isfinite(self.lead_in_radius_mm) or not 0 <= self.lead_in_radius_mm <= 10:
+            raise ValueError("ERR_INVALID_LEAD_IN_RADIUS")
 
     @staticmethod
     def compute_sheet_origin_corner(sheet_poly: Polygon) -> Tuple[float, float]:
@@ -157,6 +187,54 @@ class GCodeCompiler:
 
         return loops
 
+    def plan_lead_ins(self, loops, shifted_sheet, placed_parts, ox, oy):
+        """Find a quarter-circle approach in waste, clear of stock voids and parts.
+
+        A requested lead-in must fit; failure never silently removes it. Process
+        suitability, pierce damage and physical workholding require qualification.
+        """
+        radius = self.lead_in_radius_mm
+        solids = {p.instance_id: affinity.translate(p.polygon, -ox, -oy) for p in placed_parts}
+        for loop in loops:
+            original = loop.coords_mm[:-1]
+            found = False
+            edges = sorted(range(len(original)), key=lambda i: math.dist(original[i], original[(i + 1) % len(original)]), reverse=True)
+            for index in edges:
+                a, b = original[index], original[(index + 1) % len(original)]
+                length = math.dist(a, b)
+                # A tangent arc can span several short polyline chords. Its
+                # actual envelope, not chord length, decides whether it fits.
+                if length < 0.01:
+                    continue
+                tx, ty = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+                entry = tuple(round((a[i] + b[i]) / 2, 3) for i in (0, 1))
+                for clockwise in (True, False):
+                    nx, ny = (ty, -tx) if clockwise else (-ty, tx)
+                    center = (round(entry[0] + nx * radius, 3), round(entry[1] + ny * radius, 3))
+                    start = (round(center[0] - tx * radius, 3), round(center[1] - ty * radius, 3))
+                    try:
+                        points, _, error = arc_points(start, entry, center, clockwise)
+                    except ValueError:
+                        continue
+                    curve = LineString(points)
+                    envelope = curve.buffer(error)
+                    if not shifted_sheet.covers(envelope):
+                        continue
+                    if curve.intersection(solids[loop.instance_id].buffer(-0.003)).length > 1e-5:
+                        continue
+                    if any(envelope.intersects(poly) for key, poly in solids.items() if key != loop.instance_id):
+                        continue
+                    loop.coords_mm = [entry] + original[index + 1:] + original[:index + 1] + [entry]
+                    loop.lead_in = {"command": "G02" if clockwise else "G03", "start": start,
+                                    "end": entry, "center": center, "points": points,
+                                    "sampling_error_bound_mm": error}
+                    found = True
+                    break
+                if found:
+                    break
+            if not found:
+                raise ValueError("ERR_NO_SAFE_LEAD_IN: " + loop.instance_id + " " + loop.loop_type)
+
     def compile_iso_gcode(
         self,
         sheet_id: str,
@@ -174,6 +252,11 @@ class GCodeCompiler:
 
         shifted_sheet_poly = affinity.translate(raw_sheet_poly, xoff=-ox, yoff=-oy)
         ordered_loops = self.build_ordered_cut_loops(placed_parts, ox, oy)
+        for loop in ordered_loops:
+            loop.process = {"feed": self.cut_feedrate_mm_min, "power": self.laser_power_s,
+                            "dwell": round(self.pierce_delay_sec, 2)}
+        if self.lead_in_radius_mm:
+            self.plan_lead_ins(ordered_loops, shifted_sheet_poly, placed_parts, ox, oy)
 
         lines: List[str] = [
             f"; REMNANT-X DETERMINISTIC CNC G-CODE COMPILER",
@@ -186,9 +269,11 @@ class GCodeCompiler:
             "M05 ; Ensure laser beam OFF before homing",
             "G00 X0.000 Y0.000 ; Rapid home to sheet physical origin (0,0)",
         ]
+        if self.lead_in_radius_mm:
+            lines[7:7] = ["G17 ; XY arc plane", "G91.1 ; Incremental I/J arc centres"]
 
         for seg in ordered_loops:
-            start_x, start_y = seg.coords_mm[0]
+            start_x, start_y = seg.lead_in["start"] if seg.lead_in else seg.coords_mm[0]
             lines.append(
                 f"; --- LOOP {seg.loop_index:03d}: {self.safe_comment(seg.instance_id)} ({seg.loop_type}) ---"
             )
@@ -196,6 +281,12 @@ class GCodeCompiler:
             lines.append(f"M03 S{self.laser_power_s} ; Laser ON")
             if self.pierce_delay_sec > 0.0:
                 lines.append(f"G04 P{self.pierce_delay_sec:.2f} ; Pierce dwell")
+
+            if seg.lead_in:
+                arc = seg.lead_in
+                ex, ey = arc["end"]
+                cx, cy = arc["center"]
+                lines.append(f"{arc['command']} X{ex:.3f} Y{ey:.3f} I{cx-start_x:.3f} J{cy-start_y:.3f} F{self.cut_feedrate_mm_min:.1f}")
 
             for idx, (vx, vy) in enumerate(seg.coords_mm[1:]):
                 if idx == 0:
@@ -236,6 +327,7 @@ class GCodeCompiler:
         shifted_sheet_poly: Polygon,
         ordered_loops: List[CutLoopSegment],
         eps_mm: float = 1e-2,
+        machine_profile: str = "ISO_6983_GRBL",
     ) -> GCodeVerificationReport:
         """Independent G-Code Toolpath Verifier:
         Parses raw G-Code text back into geometric LineStrings and proves:
@@ -251,12 +343,18 @@ class GCodeCompiler:
         total_rapid_dist = 0.0
 
         errors = []
-        metric = absolute = feed_per_minute = ended = False
+        metric = absolute = feed_per_minute = ended = plane_xy = incremental_arc = False
+        exact_path = False
+        laser_known_off = False
+        dwell_count = 0
+        arc_envelopes = []
         feed = None
         number = r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
         word = re.compile(r"([A-Z])\s*(" + number + r")")
-        allowed = {"G21": set(), "G90": set(), "G94": set(), "G0": {"X", "Y"}, "G1": {"X", "Y", "F"},
-                   "G4": {"P"}, "M3": {"S"}, "M5": set(), "M30": set()}
+        allowed = {"G21": set(), "G90": set(), "G94": set(), "G17": set(), "G91.1": set(), "G61": set(),
+                   "G0": {"X", "Y"}, "G1": {"X", "Y", "F"},
+                   "G2": {"X", "Y", "I", "J", "F"}, "G3": {"X", "Y", "I", "J", "F"},
+                   "G4": {"P"}, "M3": {"S"}, "M5": set(), "M30": set(), "M2": set()}
         try:
             for line_number, raw_line in enumerate(gcode_text.splitlines(), 1):
                 line = raw_line.split(";", 1)[0].strip().upper()
@@ -268,9 +366,12 @@ class GCodeCompiler:
                 if not tokens or word.sub("", line).strip():
                     raise ValueError("invalid tokens")
                 letter, value = tokens[0].groups()
-                if letter not in {"G", "M"} or float(value) != int(float(value)):
+                if letter not in {"G", "M"}:
                     raise ValueError("one supported G/M command is required")
-                command = letter + str(int(float(value)))
+                opcode = float(value)
+                if not math.isfinite(opcode) or (opcode != int(opcode) and (letter != "G" or opcode != 91.1)):
+                    raise ValueError("unsupported fractional opcode")
+                command = "G91.1" if opcode == 91.1 else letter + str(int(opcode))
                 if command not in allowed:
                     raise ValueError("unsupported opcode " + command)
                 params = {}
@@ -286,46 +387,80 @@ class GCodeCompiler:
                     absolute = True
                 elif command == "G94":
                     feed_per_minute = True
-                elif command in {"G0", "G1"}:
+                elif command == "G17":
+                    plane_xy = True
+                elif command == "G91.1":
+                    incremental_arc = True
+                elif command == "G61":
+                    exact_path = True
+                elif command in {"G0", "G1", "G2", "G3"}:
                     if not metric or not absolute or not {"X", "Y"}.issubset(params):
                         raise ValueError("motion requires G21, G90 and explicit XY")
-                    if command == "G0" and laser_on:
-                        raise ValueError("rapid with active laser")
-                    if command == "G1" and not laser_on:
+                    if command == "G0" and (laser_on or not laser_known_off):
+                        raise ValueError("rapid requires confirmed laser-off state")
+                    if command != "G0" and not laser_on:
                         raise ValueError("feed motion with laser off")
                     if "F" in params:
                         feed = params["F"]
-                    if command == "G1" and (not feed_per_minute or feed is None or feed <= 0):
+                    if command != "G0" and (not feed_per_minute or feed is None or feed <= 0):
                         raise ValueError("positive feed required")
+                    expected_process = ordered_loops[len(active_cut_chains)].process if len(active_cut_chains) < len(ordered_loops) else {}
+                    if command != "G0" and expected_process and abs(feed - expected_process["feed"]) > 0.051:
+                        raise ValueError("feed differs from configured plan")
                     nxt = (params["X"], params["Y"])
                     distance = math.dist(curr_pt, nxt)
-                    if command == "G1":
+                    if command in {"G2", "G3"}:
+                        if not plane_xy or not incremental_arc or not {"I", "J"}.issubset(params):
+                            raise ValueError("arcs require G17, G91.1 and explicit I/J")
+                        center = (curr_pt[0] + params["I"], curr_pt[1] + params["J"])
+                        points, distance, error = arc_points(curr_pt, nxt, center, command == "G2")
+                        current_chain.extend(points[1:])
+                        arc_envelopes.append(LineString(points).buffer(error))
+                        total_cut_dist += distance
+                    elif command == "G1":
                         current_chain.append(nxt)
                         total_cut_dist += distance
                     else:
                         total_rapid_dist += distance
                     curr_pt = nxt
                 elif command == "M3":
-                    if laser_on or not metric or not absolute or not (0 < params.get("S", 0) <= 1000):
+                    if laser_on or not laser_known_off or not metric or not absolute or not (0 < params.get("S", 0) <= 1000):
                         raise ValueError("invalid laser start or power")
+                    expected_process = ordered_loops[len(active_cut_chains)].process if len(active_cut_chains) < len(ordered_loops) else {}
+                    if expected_process and abs(params["S"] - expected_process["power"]) > 0.051:
+                        raise ValueError("power differs from configured plan")
                     laser_on = True
+                    laser_known_off = False
+                    dwell_count = 0
                     current_chain = [curr_pt]
                 elif command == "G4":
                     if not laser_on or not 0 <= params.get("P", -1) <= 60:
                         raise ValueError("invalid pierce dwell")
+                    if expected_process and abs(params["P"] - expected_process["dwell"]) > 0.0051:
+                        raise ValueError("dwell differs from configured plan")
+                    dwell_count += 1
                 elif command == "M5":
                     if laser_on:
-                        if len(current_chain) < 4 or current_chain[0] != current_chain[-1]:
+                        if expected_process and dwell_count != int(expected_process["dwell"] > 0):
+                            raise ValueError("missing or repeated pierce dwell")
+                        index = len(active_cut_chains)
+                        lead_count = (len(ordered_loops[index].lead_in["points"]) - 1
+                                      if index < len(ordered_loops) and ordered_loops[index].lead_in else 0)
+                        contour = current_chain[lead_count:]
+                        if len(contour) < 4 or contour[0] != contour[-1]:
                             raise ValueError("open or empty cut contour")
                         active_cut_chains.append(current_chain)
                     laser_on = False
+                    laser_known_off = True
                     current_chain = []
-                elif command == "M30":
-                    if laser_on:
+                elif command in {"M30", "M2"}:
+                    if laser_on or not laser_known_off:
                         raise ValueError("laser on at program end")
                     ended = True
             if not ended or not metric or not absolute or not feed_per_minute or laser_on:
                 raise ValueError("incomplete program or laser left on")
+            if machine_profile == "LINUXCNC_LASER" and not exact_path:
+                raise ValueError("LinuxCNC output requires G61 exact-path mode")
         except (ValueError, OverflowError) as exc:
             errors.append(f"line {locals().get('line_number', 0)}: {exc}")
             if len(current_chain) >= 2:
@@ -336,7 +471,7 @@ class GCodeCompiler:
         matches_plan = len(active_cut_chains) == len(ordered_loops)
         if matches_plan:
             for actual, expected in zip(active_cut_chains, ordered_loops):
-                if len(actual) != len(expected.coords_mm) or any(math.dist(a, b) > 0.0011 for a, b in zip(actual, expected.coords_mm)):
+                if len(actual) != len(expected.expected_cut_coords) or any(math.dist(a, b) > 0.0011 for a, b in zip(actual, expected.expected_cut_coords)):
                     matches_plan = False
                     break
         if not matches_plan:
@@ -352,6 +487,10 @@ class GCodeCompiler:
 
         hole_collision_mm = 0.0
         outside_sheet_mm = 0.0
+
+        for envelope in arc_envelopes:
+            if not outer_shell.covers(envelope) or any(envelope.intersects(Polygon(h)) for h in shifted_sheet_poly.interiors):
+                errors.append("arc clearance envelope intersects stock void or exterior")
 
         for chain in active_cut_chains:
             cut_line = LineString(chain)
@@ -422,20 +561,26 @@ class GCodeCompiler:
     def apply_machine_profile(
         self, machine_dialect_prompt: str, compiled_gcode: Optional[CompiledSheetGCode] = None,
     ) -> str:
-        """Compatibility entry point for the bounded, deterministic GRBL profile.
-
-        Arbitrary machine/controller requests cannot be implemented by comments.
-        Proprietary controllers require a separately implemented, tested profile.
-        """
-        if machine_dialect_prompt.strip().upper() not in {"ISO_6983_GRBL", "GRBL_1_1", "GRBL"}:
-            raise ValueError("ERR_UNSUPPORTED_POSTPROCESSOR: supported profile is ISO_6983_GRBL (GRBL 1.1 laser mode)")
+        """Use a real Muse Code-prepared emitter; never generate code inside a job."""
+        profile = self.resolve_profile(machine_dialect_prompt)
         if compiled_gcode is None or not compiled_gcode.verification.verified_safe:
             raise ValueError("ERR_UNVERIFIED_PROGRAM")
-        self.last_llm_trace = {"ok": True, "provider": "deterministic", "model": None, "profile": "ISO_6983_GRBL"}
-        return ("; PROFILE: ISO_6983_GRBL / GRBL 1.1 laser mode\n"
-                "; Requires operator-configured $32=1, $30=1000 and work origin XY0\n"
-                "; Centerline contours; no cutter compensation or proprietary controller macros\n"
-                + compiled_gcode.gcode_text)
+        emitted, self.last_llm_trace = emit_prepared(profile, compiled_gcode.gcode_text)
+        if profile == "LINUXCNC_LASER":
+            emitted = "G61 ; Exact-path mode, no controller corner blending\n" + emitted
+        setup = ("GRBL 1.1: operator-configured $32=1 and $30=1000" if profile == "ISO_6983_GRBL"
+                 else "LinuxCNC: operator-qualified M3/M5 laser mapping, S range 0..1000; M2 program end")
+        return (f"; PROFILE: {profile}\n; {setup}; establish work origin XY0\n"
+                "; Centerline contours; no cutter compensation or proprietary macros\n" + emitted)
+
+    @staticmethod
+    def resolve_profile(value):
+        profile = value.strip().upper()
+        if profile in {"GRBL_1_1", "GRBL"}:
+            profile = "ISO_6983_GRBL"
+        if profile not in {"ISO_6983_GRBL", "LINUXCNC_LASER"}:
+            raise ValueError("ERR_UNSUPPORTED_POSTPROCESSOR: supported profiles are ISO_6983_GRBL and LINUXCNC_LASER")
+        return profile
 
 
     def synthesize_custom_postprocessor_via_muse_code(self, machine_dialect_prompt, compiled_gcode=None):

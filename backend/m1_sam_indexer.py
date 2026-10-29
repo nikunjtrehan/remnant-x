@@ -88,6 +88,10 @@ class RemnantOpticalIndexer:
         detected_map: Dict[int, np.ndarray] = {}
         for marker_corners, marker_id in zip(corners, ids.flatten()):
             if int(marker_id) in (0, 1, 2, 3):
+                if int(marker_id) in detected_map:
+                    raise ValueError(
+                        "ERR_DUPLICATE_FIDUCIAL: Only one marker of each station ID 0..3 may be visible."
+                    )
                 detected_map[int(marker_id)] = marker_corners[0]  # (4, 2) TL, TR, BR, BL
 
         missing = [m for m in (0, 1, 2, 3) if m not in detected_map]

@@ -1,0 +1,1148 @@
+{
+  "status": "complete",
+  "completed": 120,
+  "total": 120,
+  "started_utc": "2026-10-28T22:15:47.551976+00:00",
+  "finished_utc": "2026-10-28T22:27:04.746600+00:00",
+  "baseline_commit": "e231b084d3fa6474e078cbe22423a6576563bdbd",
+  "dataset_sha256": "29572e558859ceb166986687003bbbb4f91b3efc68fa89926a3de3b661566b55",
+  "harness_sha256": "4b8ecf3740e08bae503b7471ea97b460a363747c32f2014409f59a3f2eecff48",
+  "protected_files_unchanged": true,
+  "pricing": {
+    "baseten": {
+      "input": 1.25,
+      "cached_input": 0.15,
+      "output": 4.25,
+      "source": "https://www.baseten.co/library/muse-spark-open/"
+    },
+    "fireworks": {
+      "input": 1.25,
+      "cached_input": 0.15,
+      "output": 4.25,
+      "source": "https://fireworks.ai/models/fireworks/muse-spark-open"
+    }
+  },
+  "method_notes": [
+    "Identical production extraction prompt captured without a network call.",
+    "Two concurrent trials: results reflect light benchmark load, not isolated single-request latency.",
+    "Parallel agreement deliberately waits for both providers. No production race or cancellation is tested.",
+    "First-valid time is observational and excludes production race coordination/cancellation.",
+    "Safe rejection is a fail-closed outcome, not proof that a useful clarification question was generated.",
+    "Expected answers are agent-authored from explicit synthetic instructions; no user/domain-expert signoff.",
+    "No SAM, nesting, G-code generation, real inventory or file-upload HTTP endpoint is exercised.",
+    "Cost is an estimate from reported tokens and public list prices, not grant-account billing."
+  ],
+  "fixtures": [
+    {
+      "name": "rectangle_40x30.dxf",
+      "bounds_mm": [
+        0.0,
+        0.0,
+        40.0,
+        30.0
+      ],
+      "area_mm2": 1200.0,
+      "holes": 0,
+      "sha256": "7a8bc2f34afefcd9ac9a7fd013016d4abbdc81f9120ed9f81c11e93d8dc9507b",
+      "origin": "locally generated synthetic polygon",
+      "download_sha256": "db08747c7a4f0607a2a82c8b82fa283e3c8c731d96f1f314aa222cfc89e03e6c",
+      "download_note": "Equivalent minimal DXF; sha256 retains the original experimental file hash."
+    },
+    {
+      "name": "plate_60x40_hole_20x10.dxf",
+      "bounds_mm": [
+        0.0,
+        0.0,
+        60.0,
+        40.0
+      ],
+      "area_mm2": 2200.0,
+      "holes": 1,
+      "sha256": "d0fb26c0052be4ba9f04d21314c6b57d640c9f7203f0c96e15d939e7b68eeb7c",
+      "origin": "locally generated synthetic polygon",
+      "download_sha256": "38361295f84759056188eb86cb83765cdb411f1f4e610ac96663cefb86f195af",
+      "download_note": "Equivalent minimal DXF; sha256 retains the original experimental file hash."
+    }
+  ],
+  "summary": {
+    "current_failover": {
+      "trials": 60,
+      "correct_outcomes": 50,
+      "correct_accepts": 44,
+      "wrong_accepts": 9,
+      "unnecessary_blocks": 1,
+      "safe_rejections": 6,
+      "incomplete_transport": 0,
+      "median_ms": 3225.62,
+      "p95_ms": 6748.59,
+      "provider_requests": 60,
+      "successful_provider_requests": 60,
+      "reported_prompt_tokens": 28944,
+      "reported_completion_tokens": 57522,
+      "estimated_known_usd": 0.261641,
+      "requests_without_cost_estimate": 0,
+      "estimated_usd_per_correct_accept": 0.005946
+    },
+    "parallel_agreement": {
+      "trials": 60,
+      "correct_outcomes": 51,
+      "correct_accepts": 42,
+      "wrong_accepts": 6,
+      "unnecessary_blocks": 3,
+      "safe_rejections": 9,
+      "incomplete_transport": 1,
+      "median_ms": 18729.57,
+      "p95_ms": 31498.0,
+      "provider_requests": 120,
+      "successful_provider_requests": 119,
+      "reported_prompt_tokens": 57347,
+      "reported_completion_tokens": 109687,
+      "estimated_known_usd": 0.491953,
+      "requests_without_cost_estimate": 1,
+      "estimated_usd_per_correct_accept": 0.011713,
+      "observed_first_valid_median_ms": 3091.4
+    }
+  },
+  "pilot": [
+    {
+      "provider": "baseten",
+      "accepted": true,
+      "latency_ms": 2439.94,
+      "usage": {
+        "prompt_tokens": 457,
+        "completion_tokens": 334,
+        "total_tokens": 791,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 254,
+          "audio_tokens": 0,
+          "reasoning_tokens": 264,
+          "rejected_prediction_tokens": 306
+        }
+      },
+      "estimated_usd": 0.00199075
+    },
+    {
+      "provider": "fireworks",
+      "accepted": true,
+      "latency_ms": 29009.46,
+      "usage": {
+        "prompt_tokens": 456,
+        "total_tokens": 1202,
+        "completion_tokens": 746,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 640
+        },
+        "output_tokens_details": {
+          "reasoning_tokens": 640
+        }
+      },
+      "estimated_usd": 0.0037405
+    }
+  ],
+  "usage_accounting": {
+    "provider_requests_including_pilot": 182,
+    "known_estimated_usd_including_pilot": 0.759325,
+    "requests_with_unknown_cost": 1
+  },
+  "case_definitions": "cases.json",
+  "observed_first_valid_policy": {
+    "status": "observational_only_not_a_deployed_race",
+    "trials": 60,
+    "correct_outcomes": 50,
+    "wrong_accepts": 10,
+    "correct_accepts": 45
+  },
+  "trials": [
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 1535.68
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2451.29
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3526.88
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 6741.15
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 19663.64
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2229.46
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18787.37
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2213.74
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3306.49
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 10171.26
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 23460.92
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 23249.61
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18063.53
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2832.8
+    },
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2904.88
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2199.67
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 7561.66,
+      "failure": "validation"
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 6889.99
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 19787.97
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 24837.83
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 21331.38
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 17572.07
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 4610.25
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 24196.05,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18079.25
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 4051.23,
+      "failure": "validation"
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3134.53
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2539.17
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": false,
+      "latency_ms": 46181.02,
+      "failure": "transport"
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 17731.72,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 26147.84
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 16901.43
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3598.62
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 25940.62,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 19986.84
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2885.28
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 4190.8
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18873.05
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 5530.58
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 37090.51,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 23066.48
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 3811.54
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 20516.13
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 17877.88
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 3349.06
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 32959.77
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3122.28
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 20710.43,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 5195.77
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 19775.09
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 21573.77
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18303.65
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3121.13
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 31236.25,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 20395.62
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 13402.21
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2822.01
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3218.7
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": false,
+      "latency_ms": 5161.97,
+      "failure": "validation"
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 21639.64
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2385.78
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 14962.25
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 13414.42
+    },
+    {
+      "case_id": "01_simple_circle",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 14413.69
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 11447.31
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 26394.75,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3711.11
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 14987.82
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 14811.81
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2758.37
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 9426.81
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 10148.89
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2215.4
+    },
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 10838.31
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 28854.13
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 11371.64
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 4625.84,
+      "failure": "validation"
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3218.87
+    },
+    {
+      "case_id": "19_unresolved_grade",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 31421.06,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 8876.81
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2464.34
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 22940.64,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3006.69
+    },
+    {
+      "case_id": "09_generic_stainless_square",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3232.37
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 5194.85
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 25778.08
+    },
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": false,
+      "latency_ms": 5887.87,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 3835.39,
+      "failure": "validation"
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 9101.44
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2159.89
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3165.38
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 4924.22
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 1,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 8584.06
+    },
+    {
+      "case_id": "13_dxf_with_hole",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3017.72
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2422.74
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3570.44
+    },
+    {
+      "case_id": "11_corrected_quantity",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3574.49
+    },
+    {
+      "case_id": "03_ss304_ring",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 8254.97
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 1703.32
+    },
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 13590.23
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 1426.38
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 8267.65
+    },
+    {
+      "case_id": "18_undecided_quantity",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 18671.77
+    },
+    {
+      "case_id": "06_al5052_bracket",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2666.37
+    },
+    {
+      "case_id": "17_missing_diameter",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 6164.52,
+      "failure": "validation"
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 18112.89
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2584.94
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3778.59
+    },
+    {
+      "case_id": "20_impossible_ring",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": false,
+      "correct": true,
+      "latency_ms": 5171.68,
+      "failure": "validation"
+    },
+    {
+      "case_id": "02_mild_steel_rectangle",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 21646.58
+    },
+    {
+      "case_id": "16_missing_thickness",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": false,
+      "latency_ms": 3576.69
+    },
+    {
+      "case_id": "15_decimal_brass_ring",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 11447.32
+    },
+    {
+      "case_id": "07_mixed_parts",
+      "repetition": 1,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 4132.1
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3294.33
+    },
+    {
+      "case_id": "08_inches_to_mm",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3465.33
+    },
+    {
+      "case_id": "14_two_dxf_bindings",
+      "repetition": 2,
+      "mode": "parallel_agreement",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 10135.59
+    },
+    {
+      "case_id": "04_ss316_rectangle",
+      "repetition": 3,
+      "mode": "parallel_agreement",
+      "accepted": false,
+      "correct": false,
+      "latency_ms": 28320.6,
+      "failure": "review_required"
+    },
+    {
+      "case_id": "05_al6061_circle",
+      "repetition": 3,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 1868.82
+    },
+    {
+      "case_id": "10_grain_locked",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 2830.91
+    },
+    {
+      "case_id": "12_dxf_quantity_50",
+      "repetition": 2,
+      "mode": "current_failover",
+      "accepted": true,
+      "correct": true,
+      "latency_ms": 3809.98
+    }
+  ],
+  "full_evidence_archive": {
+    "path": "benchmark-full.json.gz",
+    "sha256": "1cf0506b876e7a79cc321caff6619e4be96f96c5390e3034b4cc7534df622d49",
+    "note": "Full normalized trial/provider/usage evidence, preserved without duplication in the page."
+  }
+}

@@ -1,11 +1,85 @@
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from dataclasses import dataclass, field
+import random
 import math
 from typing import Dict, List, Optional, Set, Tuple, Union
-from shapely import affinity
-from shapely.geometry import MultiPolygon, Polygon
-from shapely.prepared import prep
+from shapely import affinity, constrained_delaunay_triangles
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
+from shapely.geometry.polygon import orient
+from shapely.ops import unary_union
 
 from backend.db_and_parts import CADPartFactory, CADPartSpec, RemnantRecord
+
+
+@lru_cache(maxsize=256)
+def convex_pieces(poly):
+    if poly.is_empty or not poly.is_valid or poly.geom_type != "Polygon":
+        raise ValueError("ERR_NFP_INVALID_POLYGON")
+    if len(poly.exterior.coords) + sum(len(h.coords) for h in poly.interiors) > 4096:
+        raise ValueError("ERR_NFP_COMPLEXITY: vertex limit is 4096")
+    if poly.equals(poly.convex_hull):
+        return (poly,)
+    pieces = tuple(constrained_delaunay_triangles(poly).geoms)
+    if not pieces or unary_union(pieces).symmetric_difference(poly).area > 1e-7:
+        raise ValueError("ERR_NFP_DECOMPOSITION")
+    return pieces
+
+
+@lru_cache(maxsize=512)
+def no_fit_polygon(fixed, moving):
+    """Return forbidden moving-origin translations; input reference is (0, 0).
+
+    The bounded pair count fails explicitly rather than replacing concave/holed
+    stock with its convex hull. GEOS double precision is not exact arithmetic.
+    """
+    if any(p.geom_type != "Polygon" or p.is_empty or not p.is_valid for p in (fixed, moving)):
+        raise ValueError("ERR_NFP_INVALID_POLYGON")
+    a_outer, b_outer = Polygon(fixed.exterior), Polygon(moving.exterior)
+    # Disjoint connected solids with overlapping outer shells require one shell
+    # to fit wholly inside a hole of the other. The area bound rules that out
+    # even for concave shells; retain those shells without taking convex hulls.
+    if (all(Polygon(h).area < b_outer.area for h in fixed.interiors)
+        and all(Polygon(h).area < a_outer.area for h in moving.interiors)):
+        fixed, moving = a_outer, b_outer
+    a_parts, b_parts = convex_pieces(fixed), convex_pieces(moving)
+    if len(a_parts) * len(b_parts) > 20000:
+        raise ValueError("ERR_NFP_COMPLEXITY: convex-pair limit is 20000")
+    edge_work = (len(b_parts) * sum(len(p.exterior.coords)-1 for p in a_parts)
+                 + len(a_parts) * sum(len(p.exterior.coords)-1 for p in b_parts))
+    if edge_work > 500000:
+        raise ValueError("ERR_NFP_COMPLEXITY: edge-work limit is 500000")
+    sums = []
+    for a in a_parts:
+        for b in b_parts:
+            # A convex Minkowski sum merges boundary edge directions. Building
+            # every vertex pair needlessly multiplies dense circle contours.
+            polygons = (orient(a), orient(affinity.scale(b, -1, -1, origin=(0, 0))))
+            edges, starts = [], []
+            for poly in polygons:
+                points = list(poly.exterior.coords)[:-1]
+                starts.append(min(points, key=lambda p: (p[1], p[0])))
+                for first, second in zip(points, points[1:] + points[:1]):
+                    dx, dy = second[0] - first[0], second[1] - first[1]
+                    edges.append((math.atan2(dy, dx) % (2 * math.pi), dx, dy))
+            x, y = starts[0][0] + starts[1][0], starts[0][1] + starts[1][1]
+            points = [(x, y)]
+            for _, dx, dy in sorted(edges):
+                x, y = x + dx, y + dy
+                points.append((x, y))
+            sums.append(Polygon(points[:-1]).convex_hull)
+    return unary_union(sums)
+
+
+def vertices(geometry):
+    if geometry.is_empty:
+        return []
+    if geometry.geom_type == "Polygon":
+        return list(geometry.exterior.coords) + [p for ring in geometry.interiors for p in ring.coords]
+    if hasattr(geometry, "geoms"):
+        return [p for child in geometry.geoms for p in vertices(child)]
+    return list(geometry.coords)
+
 
 
 @dataclass
@@ -40,13 +114,14 @@ class BatchNestingResult:
     sheet_outcomes: List[SheetNestingOutcome]
     unplaced_instances: List[str]
     sanitizer_verified: bool
+    search_trace: Dict = field(default_factory=dict)
 
 
 class HoleAwareNester:
-    """Module 3: Deterministic 2D Hole-Aware Nesting Engine & Server-Side Sanitizer.
+    """Hole-aware NFP placement, bounded parallel annealing and independent checks.
 
-    Uses Shapely 2.x C++ GEOS spatial indexing (prepared.prep) to pack parts around
-    interior SAM 3.1 cutout holes and inside hollow donut-part centers.
+    coarse_step_mm/fine_step_mm remain accepted for older callers; NFP placement
+    uses contact vertices rather than a grid. iterations controls annealing work.
     """
 
     def __init__(
@@ -54,10 +129,16 @@ class HoleAwareNester:
         kerf_mm: float = 3.0,
         coarse_step_mm: float = 8.0,
         fine_step_mm: float = 1.0,
+        iterations: int = 0,
+        workers: int = 2,
+        seed: int = 17,
     ):
         self.kerf_mm = float(kerf_mm)
         self.coarse_step_mm = float(coarse_step_mm)
         self.fine_step_mm = float(fine_step_mm)
+        if not 0 <= iterations <= 100 or not 1 <= workers <= 4:
+            raise ValueError("ERR_INVALID_SEARCH_BUDGET")
+        self.iterations, self.workers, self.seed = iterations, workers, seed
         if not all(math.isfinite(v) for v in (self.kerf_mm, self.coarse_step_mm, self.fine_step_mm)) or self.kerf_mm < 0 or min(self.coarse_step_mm, self.fine_step_mm) <= 0:
             raise ValueError("ERR_INVALID_NESTING_STEPS_OR_KERF")
 
@@ -86,6 +167,8 @@ class HoleAwareNester:
         outer_shell = Polygon(raw_sheet_poly.exterior.coords)
         if not outer_shell.buffer(1e-4, quad_segs=8).contains(candidate_poly):
             return False, "ERR_OUTSIDE_SHEET_BOUNDARY"
+        if kerf_mm > 0.0 and candidate_poly.distance(outer_shell.boundary) < (kerf_mm - 0.15):
+            return False, "ERR_OUTER_KERF_VIOLATION"
 
         # Check overlap against every interior hole of the scrap sheet
         for hole_ring in raw_sheet_poly.interiors:
@@ -106,143 +189,75 @@ class HoleAwareNester:
 
         return True, "VERIFIED_SAFE"
 
-    def _find_best_pose_on_sheet(
-        self,
-        part_spec: CADPartSpec,
-        free_space: Union[Polygon, MultiPolygon],
-        raw_sheet_poly: Polygon,
-        already_placed: List[PlacedPartInstance],
-    ) -> Optional[Tuple[Polygon, float, float, float]]:
-        """Searches rotations and scans a Bottom-Left (Y ascending, X ascending) grid
-
-        using C++ GEOS prepared containment, followed by a 1mm gravity slide.
-        """
-        if free_space.is_empty:
-            return None
-
-        half_kerf = self.kerf_mm / 2.0
-        allowed_angles = [0.0, 180.0] if part_spec.grain_locked else [0.0, 90.0, 180.0, 270.0]
-
-        # Pre-compute rotated part geometries and their expanded half-kerf footprints
-        rotated_candidates: List[Tuple[float, Polygon, Polygon, float, float]] = []
-        seen_dims = set()
-        for angle in allowed_angles:
-            rot_poly = self._rotate_and_normalize(part_spec.polygon, angle)
-            p_minx, p_miny, p_maxx, p_maxy = rot_poly.bounds
-            w_p = round(p_maxx - p_minx, 2)
-            h_p = round(p_maxy - p_miny, 2)
-
-            # Skip redundant symmetric rotations (e.g., circle or square at 0 vs 90 deg)
-            dim_key = (w_p, h_p, round(rot_poly.area, 1))
-            if angle > 0.0 and dim_key in seen_dims and len(part_spec.polygon.interiors) == 0:
-                # Keep 90 deg for L-brackets (which have same WxH when equal-legged, so include centroid)
-                cx, cy = rot_poly.centroid.x, rot_poly.centroid.y
-                dim_key = (w_p, h_p, round(cx, 1), round(cy, 1))
-                if dim_key in seen_dims:
-                    continue
-            seen_dims.add(dim_key)
-
-            footprint = (
-                rot_poly.buffer(half_kerf, quad_segs=16)
-                if half_kerf > 0.0
-                else rot_poly
-            )
-            rotated_candidates.append((angle, rot_poly, footprint, w_p, h_p))
-
-        prepared_free = prep(free_space)
-        f_minx, f_miny, f_maxx, f_maxy = free_space.bounds
-
-        best_choice: Optional[Tuple[float, float, Polygon, float]] = None  # (y, x, poly, angle)
-
-        for angle, rot_poly, footprint, w_p, h_p in rotated_candidates:
-            max_search_x = f_maxx - w_p
-            max_search_y = f_maxy - h_p
-            if max_search_x < f_minx or max_search_y < f_miny:
+    def _find_best_pose_on_sheet(self, part_spec, free_space, raw_sheet_poly, already_placed):
+        del free_space  # NFPs encode raw-stock voids and placed solids directly.
+        kerf = self.kerf_mm
+        sx0, sy0, sx1, sy1 = raw_sheet_poly.bounds
+        voids = box(sx0, sy0, sx1, sy1).difference(raw_sheet_poly)
+        obstacles = ([voids] if voids.geom_type == "Polygon" and not voids.is_empty
+                     else list(voids.geoms) if hasattr(voids, "geoms") else [])
+        obstacles += [p.polygon for p in already_placed]
+        normalized_obstacles = []
+        for obstacle in obstacles:
+            if obstacle.geom_type != "Polygon" or obstacle.is_empty:
                 continue
+            ox, oy = obstacle.bounds[:2]
+            normalized_obstacles.append((CADPartFactory.normalize_to_origin(obstacle), ox, oy))
 
-            # Generate candidate Y and X grid coordinates
-            y_vals = list(
-                self._frange(f_miny, max_search_y, self.coarse_step_mm)
-            )
-            x_vals = list(
-                self._frange(f_minx, max_search_x, self.coarse_step_mm)
-            )
-
-            found_for_angle = False
-            for cy in y_vals:
-                # Early exit if we already found a lower Y at another rotation
-                if best_choice is not None and cy > best_choice[0] + self.coarse_step_mm:
+        best = None
+        seen = []
+        for angle in ([0, 180] if part_spec.grain_locked else [0, 90, 180, 270]):
+            moving = self._rotate_and_normalize(part_spec.polygon, angle)
+            if any(moving.equals(previous) for previous in seen):
+                continue
+            seen.append(moving)
+            _, _, width, height = moving.bounds
+            x0, y0, x1, y1 = sx0 + kerf, sy0 + kerf, sx1 - width - kerf, sy1 - height - kerf
+            if x1 < x0 - 1e-8 or y1 < y0 - 1e-8:
+                continue
+            if abs(x1 - x0) < 1e-8 and abs(y1 - y0) < 1e-8:
+                domain = Point(x0, y0)
+            elif abs(x1 - x0) < 1e-8 or abs(y1 - y0) < 1e-8:
+                domain = LineString([(x0, y0), (x1, y1)])
+            else:
+                domain = box(x0, y0, x1, y1)
+            # Circumscribe the round-buffer polygon so its chords do not
+            # understate clearance between NFP contacts and curved boundaries.
+            footprint = moving.buffer(kerf / math.cos(math.pi / 32), quad_segs=8) if kerf else moving
+            forbidden = unary_union([
+                affinity.translate(no_fit_polygon(obstacle, footprint), ox, oy)
+                for obstacle, ox, oy in normalized_obstacles])
+            feasible = domain.difference(forbidden)
+            # Include contacts for exact-fit line/point domains: closed polygon
+            # difference can remove their legal touching translations entirely.
+            candidates = vertices(feasible) + vertices(domain)
+            if not forbidden.is_empty:
+                candidates += vertices(forbidden.boundary.intersection(domain))
+            for x, y in sorted(set(candidates), key=lambda p: (p[1], p[0])):
+                if best is not None and (y, x) >= best[:2]:
                     break
-
-                for cx in x_vals:
-                    moved_fp = affinity.translate(footprint, xoff=cx, yoff=cy)
-                    if prepared_free.contains(moved_fp):
-                        # Refine with 1mm Bottom-Left gravity slide
-                        rx, ry = self._gravity_slide(
-                            footprint, prepared_free, cx, cy, f_minx, f_miny
-                        )
-                        final_poly = affinity.translate(rot_poly, xoff=rx, yoff=ry)
-
-                        ok, _ = self.verify_placement_sanitizer(
-                            final_poly, raw_sheet_poly, already_placed, self.kerf_mm
-                        )
-                        if ok:
-                            score_tuple = (ry, rx)
-                            if best_choice is None or score_tuple < (best_choice[0], best_choice[1]):
-                                best_choice = (ry, rx, final_poly, angle)
-                            found_for_angle = True
-                            break
-                if found_for_angle:
+                candidate = affinity.translate(moving, x, y)
+                if not raw_sheet_poly.buffer(1e-8).covers(candidate):
+                    continue
+                if kerf and candidate.distance(raw_sheet_poly.boundary) < kerf - 1e-6:
+                    continue
+                if any(candidate.intersection(p.polygon).area > 1e-8 or
+                       candidate.distance(p.polygon) < kerf - 1e-6 for p in already_placed):
+                    continue
+                valid, _ = self.verify_placement_sanitizer(candidate, raw_sheet_poly, already_placed, kerf)
+                if valid:
+                    best = (y, x, candidate, angle)
                     break
-
-        if best_choice is None:
+        if best is None:
             return None
+        y, x, candidate, angle = best
+        return candidate, float(x), float(y), float(angle)
 
-        best_y, best_x, best_poly, best_angle = best_choice
-        return best_poly, round(best_x, 2), round(best_y, 2), best_angle
-
-    def _gravity_slide(
-        self,
-        footprint: Polygon,
-        prepared_free,
-        start_x: float,
-        start_y: float,
-        min_x: float,
-        min_y: float,
-    ) -> Tuple[float, float]:
-        """Slides a valid placement down (-Y) and left (-X) in fine_step_mm increments."""
-        curr_x, curr_y = start_x, start_y
-        step = self.fine_step_mm
-
-        # Slide down (-Y) until touching boundary
-        while curr_y - step >= min_y:
-            test_fp = affinity.translate(footprint, xoff=curr_x, yoff=curr_y - step)
-            if prepared_free.contains(test_fp):
-                curr_y -= step
-            else:
-                break
-
-        # Slide left (-X) until touching boundary
-        while curr_x - step >= min_x:
-            test_fp = affinity.translate(footprint, xoff=curr_x - step, yoff=curr_y)
-            if prepared_free.contains(test_fp):
-                curr_x -= step
-            else:
-                break
-
-        return curr_x, curr_y
-
-    @staticmethod
-    def _frange(start: float, stop: float, step: float):
-        curr = start
-        while curr <= stop + 1e-5:
-            yield curr
-            curr += step
-
-    def nest_batch_across_sheets(
+    def _nest_order(
         self,
         sheets: List[RemnantRecord],
         part_specs: List[CADPartSpec],
+        instance_order: Optional[List[str]] = None,
     ) -> BatchNestingResult:
         """Executes multi-sheet batch nesting with:
 
@@ -262,6 +277,11 @@ class HoleAwareNester:
             key=lambda item: (item[1].envelope_area_mm2, item[1].solid_area_mm2),
             reverse=True,
         )
+        if instance_order is not None:
+            instances = dict(expanded_queue)
+            if len(instance_order) != len(instances) or set(instance_order) != set(instances):
+                raise ValueError("ERR_INVALID_INSTANCE_ORDER")
+            expanded_queue = [(key, instances[key]) for key in instance_order]
 
         total_requested = len(expanded_queue)
         unplaced_queue = list(expanded_queue)
@@ -369,6 +389,63 @@ class HoleAwareNester:
             sanitizer_verified=True,
         )
 
+    @staticmethod
+    def _energy(result, total_area):
+        missed = result.total_requested - result.total_placed
+        used = sum(s.initial_usable_area_mm2 for s in result.sheet_outcomes)
+        envelope = 0
+        for sheet in result.sheet_outcomes:
+            bounds = unary_union([p.polygon for p in sheet.placed_parts]).bounds
+            envelope += (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
+        return missed * 1e6 + used / total_area * 1000 + result.sheets_used * 10 + envelope / total_area
 
-# Compatibility for earlier Python callers; the algorithm is a grid search.
+    def nest_batch_across_sheets(self, sheets, part_specs):
+        seed_order = [f"{p.part_id}_{i:03d}"
+                      for p in sorted(part_specs, key=lambda p: (p.envelope_area_mm2, p.solid_area_mm2), reverse=True)
+                      for i in range(1, p.quantity + 1)]
+        geometry_by_id = {f"{p.part_id}_{i:03d}": (p.polygon.wkb, p.grain_locked)
+                          for p in part_specs for i in range(1, p.quantity + 1)}
+        total_area = max(sum(s.usable_area_mm2 for s in sheets), 1)
+
+        def chain(worker):
+            rng = random.Random(self.seed + worker)
+            order = list(seed_order)
+            current = self._nest_order(sheets, part_specs, order)
+            energy = self._energy(current, total_area)
+            best, best_energy = current, energy
+            evaluated, accepted_worse = 1, 0
+            if len(set(geometry_by_id.values())) > 1:
+                for iteration in range(self.iterations):
+                    proposed = list(order)
+                    a = rng.randrange(len(proposed))
+                    choices = [i for i, key in enumerate(proposed)
+                               if geometry_by_id[key] != geometry_by_id[proposed[a]]]
+                    b = rng.choice(choices)
+                    proposed[a], proposed[b] = proposed[b], proposed[a]
+                    candidate = self._nest_order(sheets, part_specs, proposed)
+                    evaluated += 1
+                    new_energy = self._energy(candidate, total_area)
+                    delta = new_energy - energy
+                    temperature = max(0.001, 0.2 * (1 - iteration / max(self.iterations, 1)))
+                    if delta <= 0 or rng.random() < math.exp(-min(delta / temperature, 700)):
+                        accepted_worse += int(delta > 0)
+                        order, current, energy = proposed, candidate, new_energy
+                    if new_energy < best_energy:
+                        best, best_energy = candidate, new_energy
+            return best_energy, best, evaluated, accepted_worse
+
+        workers = self.workers if self.iterations and len(set(geometry_by_id.values())) > 1 else 1
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="nfp-anneal") as executor:
+            results = list(executor.map(chain, range(workers)))
+        _, best, _, _ = min(results, key=lambda r: r[0])
+        best.search_trace = {"algorithm": "nfp_simulated_annealing", "workers": workers,
+                             "iterations_per_chain": self.iterations, "seed": self.seed,
+                             "layouts_evaluated": sum(r[2] for r in results),
+                             "accepted_worse_moves": sum(r[3] for r in results),
+                             "nfp_convex_pair_limit": 20000, "globally_optimal": False}
+        return best
+
+
+# Public aliases retained for earlier Python callers. All use the same NFP engine.
+NFPAnnealingNester = HoleAwareNester
 HoleAwareNFPNester = HoleAwareNester

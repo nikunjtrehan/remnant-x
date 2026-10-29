@@ -1,0 +1,361 @@
+[
+  {
+    "id": "01_simple_circle",
+    "prompt": "Cut 5 discs of diameter 20 mm from 3 mm steel sheet. Kerf 1 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "steel",
+      "thickness_mm": 3,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "circle",
+          "quantity": 5,
+          "diameter_mm": 20
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "02_mild_steel_rectangle",
+    "prompt": "Make 8 rectangular plates, width 40 mm and height 30 mm, from 2 mm mild steel. Kerf 0.8 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "mild_steel",
+      "thickness_mm": 2,
+      "kerf_mm": 0.8,
+      "parts": [
+        {
+          "shape_type": "rectangle",
+          "quantity": 8,
+          "width_mm": 40,
+          "height_mm": 30
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "03_ss304_ring",
+    "prompt": "Cut 12 washers: outside diameter 60 mm, inside diameter 20 mm. Use 5 mm SS304 sheet and kerf 0.6 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "ss304",
+      "thickness_mm": 5,
+      "kerf_mm": 0.6,
+      "parts": [
+        {
+          "shape_type": "ring",
+          "quantity": 12,
+          "outer_diam_mm": 60,
+          "inner_diam_mm": 20
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "04_ss316_rectangle",
+    "prompt": "Make 6 rectangles 100 mm wide by 50 mm high in 4 mm SS316. Kerf 1 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "ss316",
+      "thickness_mm": 4,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "rectangle",
+          "quantity": 6,
+          "width_mm": 100,
+          "height_mm": 50
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "05_al6061_circle",
+    "prompt": "Cut 20 circles of diameter 30 mm from 2 mm AL6061 sheet, kerf 0.5 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "al6061",
+      "thickness_mm": 2,
+      "kerf_mm": 0.5,
+      "parts": [
+        {
+          "shape_type": "circle",
+          "quantity": 20,
+          "diameter_mm": 30
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "06_al5052_bracket",
+    "prompt": "Make 4 flat L-brackets from 3 mm AL5052. Overall width 80 mm, overall height 60 mm, both legs 10 mm wide. Kerf 0.7 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "al5052",
+      "thickness_mm": 3,
+      "kerf_mm": 0.7,
+      "parts": [
+        {
+          "shape_type": "l_bracket",
+          "quantity": 4,
+          "width_mm": 80,
+          "height_mm": 60,
+          "thickness_leg_mm": 10
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "07_mixed_parts",
+    "prompt": "From 3 mm steel, cut 3 discs of diameter 20 mm, 2 rectangles 40 by 30 mm, and 4 washers with outside diameter 60 mm and inside diameter 20 mm. Kerf 1 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "steel",
+      "thickness_mm": 3,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "circle",
+          "quantity": 3,
+          "diameter_mm": 20
+        },
+        {
+          "shape_type": "rectangle",
+          "quantity": 2,
+          "width_mm": 40,
+          "height_mm": 30
+        },
+        {
+          "shape_type": "ring",
+          "quantity": 4,
+          "outer_diam_mm": 60,
+          "inner_diam_mm": 20
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "08_inches_to_mm",
+    "prompt": "Cut 4 rectangles, each 2 inches wide by 1 inch high, from 1/8 inch thick AL6061 sheet. Kerf 0.5 mm. Express all dimensions in millimeters.",
+    "uploads": [],
+    "expected": {
+      "material": "al6061",
+      "thickness_mm": 3.175,
+      "kerf_mm": 0.5,
+      "parts": [
+        {
+          "shape_type": "rectangle",
+          "quantity": 4,
+          "width_mm": 50.8,
+          "height_mm": 25.4
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "09_generic_stainless_square",
+    "prompt": "Cut 9 square plates with 25 mm sides from 1.5 mm stainless steel. No alloy grade is specified. Kerf 0.4 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "stainless_steel",
+      "thickness_mm": 1.5,
+      "kerf_mm": 0.4,
+      "parts": [
+        {
+          "shape_type": "rectangle",
+          "quantity": 9,
+          "width_mm": 25,
+          "height_mm": 25
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "10_grain_locked",
+    "prompt": "Make 6 rectangles, width 120 mm along the sheet X axis and height 15 mm, from 2 mm AL5052. Grain direction must be preserved: set grain_locked true. Kerf 0.5 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "al5052",
+      "thickness_mm": 2,
+      "kerf_mm": 0.5,
+      "parts": [
+        {
+          "shape_type": "rectangle",
+          "quantity": 6,
+          "width_mm": 120,
+          "height_mm": 15,
+          "grain_locked": true
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "11_corrected_quantity",
+    "prompt": "I initially wanted 5 discs but change the quantity to 7 discs, diameter 20 mm, from 3 mm SS316. The final quantity is 7, not 5. Kerf 1 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "ss316",
+      "thickness_mm": 3,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "circle",
+          "quantity": 7,
+          "diameter_mm": 20
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "12_dxf_quantity_50",
+    "prompt": "Cut 50 copies of the uploaded DXF part from 3 mm SS304 sheet. Kerf 1 mm.",
+    "uploads": [
+      "rectangle_40x30.dxf"
+    ],
+    "expected": {
+      "material": "ss304",
+      "thickness_mm": 3,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "dxf_file",
+          "quantity": 50,
+          "dxf_path": "rectangle_40x30.dxf"
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "13_dxf_with_hole",
+    "prompt": "Make 10 copies of the uploaded DXF, retaining its existing hole. Use 2 mm AL6061 and kerf 0.5 mm.",
+    "uploads": [
+      "plate_60x40_hole_20x10.dxf"
+    ],
+    "expected": {
+      "material": "al6061",
+      "thickness_mm": 2,
+      "kerf_mm": 0.5,
+      "parts": [
+        {
+          "shape_type": "dxf_file",
+          "quantity": 10,
+          "dxf_path": "plate_60x40_hole_20x10.dxf"
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "14_two_dxf_bindings",
+    "prompt": "From 3 mm steel, make 12 copies of rectangle_40x30.dxf and 7 copies of plate_60x40_hole_20x10.dxf. Both are uploaded DXF parts. Kerf 1 mm.",
+    "uploads": [
+      "rectangle_40x30.dxf",
+      "plate_60x40_hole_20x10.dxf"
+    ],
+    "expected": {
+      "material": "steel",
+      "thickness_mm": 3,
+      "kerf_mm": 1,
+      "parts": [
+        {
+          "shape_type": "dxf_file",
+          "quantity": 12,
+          "dxf_path": "rectangle_40x30.dxf"
+        },
+        {
+          "shape_type": "dxf_file",
+          "quantity": 7,
+          "dxf_path": "plate_60x40_hole_20x10.dxf"
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "15_decimal_brass_ring",
+    "prompt": "Cut 18 washers from 0.8 mm brass: outer diameter 12.5 mm, inner diameter 6.25 mm. Kerf 0.25 mm.",
+    "uploads": [],
+    "expected": {
+      "material": "brass",
+      "thickness_mm": 0.8,
+      "kerf_mm": 0.25,
+      "parts": [
+        {
+          "shape_type": "ring",
+          "quantity": 18,
+          "outer_diam_mm": 12.5,
+          "inner_diam_mm": 6.25
+        }
+      ]
+    },
+    "expected_action": "accept",
+    "rationale": "Every scored requirement is explicit in the prompt; generated IDs are ignored."
+  },
+  {
+    "id": "16_missing_thickness",
+    "prompt": "Cut 5 discs of diameter 20 mm from SS304 sheet. Kerf 1 mm.",
+    "uploads": [],
+    "expected": null,
+    "expected_action": "reject_or_clarify",
+    "rationale": "Sheet thickness is absent; no business default authorizes inventing it."
+  },
+  {
+    "id": "17_missing_diameter",
+    "prompt": "Cut 5 circular discs from 3 mm SS304 sheet. Kerf 1 mm.",
+    "uploads": [],
+    "expected": null,
+    "expected_action": "reject_or_clarify",
+    "rationale": "Disc diameter is absent; the part cannot be defined."
+  },
+  {
+    "id": "18_undecided_quantity",
+    "prompt": "Cut either 5 or 10 discs of diameter 20 mm from 3 mm steel. I have not decided which quantity. Kerf 1 mm.",
+    "uploads": [],
+    "expected": null,
+    "expected_action": "reject_or_clarify",
+    "rationale": "Quantity is explicitly undecided; neither alternative is an authorized order."
+  },
+  {
+    "id": "19_unresolved_grade",
+    "prompt": "Cut 5 discs of diameter 20 mm from 3 mm sheet, kerf 1 mm. The drawing says SS304 but procurement says SS316. I do not know which grade is required.",
+    "uploads": [],
+    "expected": null,
+    "expected_action": "reject_or_clarify",
+    "rationale": "The requested material grade is unresolved; a single grade must not be silently chosen."
+  },
+  {
+    "id": "20_impossible_ring",
+    "prompt": "Cut 2 washers from 3 mm steel, outer diameter 20 mm and inner diameter 30 mm. Kerf 1 mm.",
+    "uploads": [],
+    "expected": null,
+    "expected_action": "reject_or_clarify",
+    "rationale": "The inner diameter exceeds the outer diameter; the geometry is impossible."
+  }
+]

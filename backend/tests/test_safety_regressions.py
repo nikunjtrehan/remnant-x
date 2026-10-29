@@ -330,7 +330,7 @@ def test_synthetic_photo_to_saved_geometry_keeps_local_provenance(tmp_path):
     app, client = make_api(tmp_path)
     photo = _create_synthetic_station_image()
     _, encoded = cv2.imencode(".png", photo)
-    request = {"sheet_id": "LOCAL_TEST", "material": "ss304", "image_base64": base64.b64encode(encoded).decode(),
+    request = {"sheet_id": "LOCAL_TEST", "material": "ss304", "thickness_mm": 3, "image_base64": base64.b64encode(encoded).decode(),
                "segmentation_mode": "local_threshold"}
     response = client.post("/api/v1/index-remnant", json=request)
     assert response.status_code == 200, response.text

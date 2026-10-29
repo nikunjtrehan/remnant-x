@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -13,6 +14,7 @@ from backend.llm_client import LiveModelClient
 
 
 from backend.materials import MATERIAL_SYNONYMS, normalize_material, explicit_prompt_materials
+from backend.order_intent import inspect_order_prompt, check_order_intent
 import math
 import time
 
@@ -359,6 +361,7 @@ class SparkWarehouseOrchestrator:
 
         Ambiguous or unsupported clauses fail instead of producing partial orders.
         """
+        intent = inspect_order_prompt(raw_prompt, uploaded_dxf_files)
         text = raw_prompt.lower()
         if re.search(r"(?<![a-z0-9])[-+]\s*\d|(?<![0-9])\.\d", text):
             raise ValueError("ERR_AMBIGUOUS_NUMBER: use unsigned dimensions with a leading digit")
@@ -523,13 +526,15 @@ class SparkWarehouseOrchestrator:
         allowed_words = set("cut make need want please i we from on sheet sheets stock mm thick thickness material with and plus of the a an in diameter inner outer od id solid hollow uploaded dxf cad custom file part parts grain locked lock fixed steel stainless aluminum aluminium acrylic brass copper titanium mild carbon galvanized quantity units pcs pieces x by at kerf".split())
         if words - allowed_words:
             raise ValueError("ERR_UNPARSED_ORDER: unsupported or ambiguous clause; use a structured order")
-        return {
+        payload = {
             "order_id": "ORD_FALLBACK_REGEX",
             "material": material,
             "thickness_mm": thickness_mm,
             "kerf_mm": float(kerf_match.group(1)) if kerf_match else 3.0,
             "parts": parts,
         }
+        check_order_intent(intent, payload)
+        return payload
 
     def parse_natural_language_order_via_spark(
         self,
@@ -545,6 +550,7 @@ class SparkWarehouseOrchestrator:
             raise ValueError(
                 "ERR_EMPTY_PROMPT: Natural language order prompt cannot be empty."
             )
+        intent = inspect_order_prompt(raw_prompt, uploaded_dxf_files)
 
         dxf_context_note = ""
         if uploaded_dxf_files:
@@ -557,6 +563,7 @@ class SparkWarehouseOrchestrator:
         system_prompt = (
             "You are the RemnantX Manufacturing BOM Compiler powered by Meta Muse Spark Open. "
             "Convert the user's natural-language shop-floor request into a strict JSON object. "
+            "Do not invent missing requirements or repair contradictory dimensions; the caller requires clarification instead. "
             + dxf_context_note
             + "Output ONLY valid JSON (no markdown commentary outside JSON) matching this schema:\n"
             "{\n"
@@ -586,26 +593,51 @@ class SparkWarehouseOrchestrator:
         res = self.llm.chat_completion(
             system_prompt=system_prompt,
             user_prompt=raw_prompt,
-            prefer_provider="baseten",
+            prefer_provider=getattr(self.llm, "order_provider", "baseten"),
             max_tokens=2048,
             temperature=0.1,
         )
 
-        if res["ok"] and res["parsed_json"]:
+        def checked_response(response):
+            if not response.get("ok") or not isinstance(response.get("parsed_json"), dict):
+                raise ValueError("ERR_MODEL_ORDER_JSON")
+            parsed = self.validate_and_parse_order_dict(response["parsed_json"], uploaded_dxf_files=uploaded_dxf_files)
+            expected = explicit_prompt_materials(raw_prompt)
+            if expected and expected != {parsed.material}:
+                raise ValueError("ERR_MODEL_CHANGED_MATERIAL_GRADE")
+            check_order_intent(intent, parsed)
+            return parsed
+
+        repair_trace = None
+        if res["ok"]:
+            try:
+                parsed = checked_response(res)
+            except ValueError as original_error:
+                if not getattr(self.llm, "has_fireworks", False) or res.get("provider") == "fireworks":
+                    raise
+                repair_trace = {"provider": res.get("provider"), "model": res.get("model"),
+                                "validation_error": str(original_error), "usage": res.get("usage", {})}
+                # One grounded repair of a complete prompt, never invention of
+                # missing requirements or AI-generated manufacturing settings.
+                res = self.llm.chat_completion(
+                    system_prompt=system_prompt + "\nCorrect the rejected extraction using only the original request. Output the full schema.",
+                    user_prompt=raw_prompt + "\nRejected extraction: " + json.dumps(res.get("parsed_json"))
+                    + "\nDeterministic validation error: " + str(original_error),
+                    prefer_provider="fireworks", failover=False, timeout_sec=30,
+                    max_tokens=2048, temperature=0.1)
+                parsed = checked_response(res)
             self.last_llm_trace = {
                 "ok": True,
                 "provider": res["provider"],
                 "model": res["model"],
-                "latency_ms": res["latency_ms"],
+                "latency_ms": round((time.perf_counter() - parse_started) * 1000, 2),
                 "reasoning_content": res["reasoning_content"],
                 "raw_content": res["content"],
                 "usage": res["usage"],
                 "error": None,
+                "rejected_primary": repair_trace,
+                "repair_attempted": repair_trace is not None,
             }
-            parsed = self.validate_and_parse_order_dict(res["parsed_json"], uploaded_dxf_files=uploaded_dxf_files)
-            expected = explicit_prompt_materials(raw_prompt)
-            if expected and expected != {parsed.material}:
-                raise ValueError("ERR_MODEL_CHANGED_MATERIAL_GRADE")
             return parsed
 
         # Upgrade #2: Deterministic Regex Fallback if all cloud endpoints are unreachable

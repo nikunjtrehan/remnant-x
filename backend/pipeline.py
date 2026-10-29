@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 from shapely import affinity
+from shapely.geometry import LineString
+from shapely.ops import unary_union
 from backend.llm_client import LiveModelClient
 from backend.m2_spark_orchestrator import SparkWarehouseOrchestrator
 from backend.m3_nfp_nester import HoleAwareNester
@@ -31,6 +33,7 @@ def check_order_uploads(spec, upload_root: Path):
 def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_root: Path) -> Dict[str, Any]:
     orch = SparkWarehouseOrchestrator(db, llm_client=llm)
     started = time.perf_counter()
+    profile = GCodeCompiler.resolve_profile(req.machine_dialect_prompt or req.machine_profile)
     timings = {}
     uploaded = checked_uploads(req.uploaded_dxf_files, upload_root)
     if req.prompt and req.order:
@@ -61,6 +64,7 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
         kerf_mm=order_spec.kerf_mm,
         coarse_step_mm=req.coarse_step_mm,
         fine_step_mm=req.fine_step_mm,
+        iterations=req.search_iterations, workers=req.search_workers, seed=req.search_seed,
     )
     batch_result = nester.nest_batch_across_sheets(
         sheets=plan.candidate_sheets,
@@ -71,7 +75,9 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
     stage = time.perf_counter()
     if not batch_result.sanitizer_verified:
         raise ValueError("ERR_UNVERIFIED_NESTING")
-    compiler = GCodeCompiler(llm_client=llm)
+    compiler = GCodeCompiler(llm_client=llm, lead_in_radius_mm=req.lead_in_radius_mm,
+                             cut_feedrate_mm_min=req.cut_feedrate_mm_min,
+                             pierce_delay_sec=req.pierce_delay_sec, laser_power_s=req.laser_power_s)
     sheet_map = {s.sheet_id: s for s in plan.candidate_sheets}
     compiled_gcodes: List[Dict[str, Any]] = []
     updated_remnants: List[Dict[str, Any]] = []
@@ -88,15 +94,20 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
             placed_parts=outcome.placed_parts,
         )
         cg.gcode_text = compiler.apply_machine_profile(
-            req.machine_dialect_prompt or req.machine_profile, compiled_gcode=cg)
+            profile, compiled_gcode=cg)
         cg.llm_trace = compiler.last_llm_trace
         # Re-parse the exact final program, including every added block.
         shifted = affinity.translate(raw_sheet.polygon, xoff=-cg.origin_x_mm, yoff=-cg.origin_y_mm)
-        cg.verification = compiler.verify_gcode_toolpath(cg.gcode_text, shifted, cg.ordered_loops)
+        cg.verification = compiler.verify_gcode_toolpath(cg.gcode_text, shifted, cg.ordered_loops, machine_profile=profile)
         if not cg.verification.verified_safe:
             raise ValueError("ERR_UNSAFE_GCODE: " + cg.verification.error_message)
         compiled_gcodes.append(serialize_compiled_gcode(cg))
         pending_cuts[outcome.sheet_id] = [p.polygon for p in outcome.placed_parts]
+        pending_cuts[outcome.sheet_id] += [affinity.translate(LineString(loop.lead_in["points"]),
+            cg.origin_x_mm, cg.origin_y_mm).buffer(
+            loop.lead_in["sampling_error_bound_mm"]) for loop in cg.ordered_loops if loop.lead_in]
+        consumed = unary_union([p.buffer(order_spec.kerf_mm / 2) for p in pending_cuts[outcome.sheet_id]])
+        outcome.remaining_usable_area_mm2 = round(raw_sheet.polygon.difference(consumed).area, 2)
         expected_wkts[outcome.sheet_id] = raw_sheet.polygon.wkt
 
     timings["compile_and_verify_ms"] = round((time.perf_counter() - stage) * 1000, 2)
@@ -119,14 +130,14 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
 
     return {
         "status": batch_result.status,
-        "machine_profile": req.machine_profile,
+        "machine_profile": profile,
         "timings_ms": timings,
         "metrics": {"sheets_used": len(used), "input_usable_area_mm2": round(input_area, 2),
                     "placed_solid_area_mm2": round(part_area, 2),
                     "usable_area_utilization_pct": round(100 * part_area / input_area, 2) if input_area else 0,
                     "money_saved": None, "co2_saved_kg": None,
                     "savings_note": "Requires a measured virgin-stock baseline, prices and lifecycle assumptions."},
-        "verification_scope": "Planned centerline geometry and supported GRBL commands; excludes physical sheet accuracy, kerf compensation and machine process qualification.",
+        "verification_scope": f"Planned centerline/lead-in geometry, process values and supported {profile} commands; excludes physical sheet accuracy, kerf compensation and machine process qualification.",
         "order": {
             "order_id": order_spec.order_id,
             "material": order_spec.material,
@@ -138,6 +149,7 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
         "orchestration_llm_trace": plan.llm_trace,
         "candidate_sheets": candidates_json,
         "nesting": {
+            "search": batch_result.search_trace,
             "status": batch_result.status,
             "total_requested": batch_result.total_requested,
             "total_placed": batch_result.total_placed,

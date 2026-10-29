@@ -92,6 +92,8 @@ def serialize_compiled_gcode(cg: CompiledSheetGCode) -> Dict[str, Any]:
                 "instance_id": seg.instance_id,
                 "loop_type": seg.loop_type,
                 "coords_mm": [[x, y] for x, y in seg.coords_mm],
+                "lead_in": seg.lead_in,
+                "process": seg.process,
             }
             for seg in cg.ordered_loops
         ],

@@ -15,8 +15,8 @@ class UpsertRemnantRequest(RequestModel):
 
 class IndexImageRequest(RequestModel):
     sheet_id: str = "REM_CAM_01"
-    material: str = "steel"
-    thickness_mm: float = Field(default=3.0, ge=0.1, le=50)
+    material: str = Field(min_length=1)
+    thickness_mm: float = Field(ge=0.1, le=50)
     image_base64: str = Field(max_length=30_000_000)
     table_width_mm: float = Field(default=600.0, gt=0, le=2000)
     table_height_mm: float = Field(default=450.0, gt=0, le=2000)
@@ -45,8 +45,15 @@ class FullPipelineRequest(RequestModel):
     order: Optional[Dict[str, Any]] = None
     coarse_step_mm: float = Field(default=8.0, ge=0.1, le=1000)
     fine_step_mm: float = Field(default=1.0, ge=0.01, le=1000)
+    search_iterations: int = Field(default=2, ge=0, le=100)
+    search_workers: int = Field(default=2, ge=1, le=4)
+    search_seed: int = 17
     commit_cuts_to_db: bool = False
     machine_dialect_prompt: Optional[str] = None
-    machine_profile: Literal["ISO_6983_GRBL"] = "ISO_6983_GRBL"
+    machine_profile: Literal["ISO_6983_GRBL", "LINUXCNC_LASER"] = "ISO_6983_GRBL"
+    lead_in_radius_mm: float = Field(default=0, ge=0, le=10)
+    cut_feedrate_mm_min: float = Field(default=1800, gt=0, le=100000)
+    pierce_delay_sec: float = Field(default=0.4, ge=0, le=60)
+    laser_power_s: int = Field(default=1000, ge=1, le=1000)
     uploaded_dxf_files: List[str] = Field(default_factory=list)
     allow_demo_stock: bool = False

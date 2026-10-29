@@ -85,6 +85,7 @@ def test_gcode_verifier_catches_rogue_hole_cut():
             "G21",
             "G90",
             "G94",
+            "M05",
             "G00 X50.000 Y150.000",
             "M03 S1000",
             "G01 X250.000 Y150.000 F1800.0",

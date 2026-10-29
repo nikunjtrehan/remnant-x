@@ -26,6 +26,9 @@ class LiveModelClient:
     """Try the preferred provider, then the remaining configured providers."""
 
     def __init__(self) -> None:
+        self.order_provider = os.getenv("REMNANTX_ORDER_PROVIDER", "baseten").strip().lower()
+        if self.order_provider not in {"baseten", "fireworks", "meta"}:
+            raise ValueError("ERR_ORDER_PROVIDER: choose baseten, fireworks or meta")
         # Baseten
         self.baseten_api_key: str = os.getenv("BASETEN_API_KEY", "").strip()
         self.baseten_base_url: str = os.getenv(
@@ -99,6 +102,7 @@ class LiveModelClient:
         temperature: float = 0.1,
         prefer_provider: str = "baseten",
         timeout_sec: float = 45.0,
+        failover: bool = True,
     ) -> Dict[str, Any]:
         """
         Executes a live completion call starting with `prefer_provider` and failing
@@ -108,6 +112,8 @@ class LiveModelClient:
         ordered = [prefer_provider] + [
             p for p in all_providers if p != prefer_provider
         ]
+        if not failover:
+            ordered = [prefer_provider]
 
         last_error = "No live API keys configured in .env"
         for provider in ordered:

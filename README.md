@@ -2,7 +2,9 @@
 
 Backend prototype for photo → remnant inventory → manufacturing order → nesting → verified G-code. Meta SAM 3.1 supplies segmentation; model-assisted order parsing supplies structured requests; local geometry decides placement and verifies the generated program.
 
-Read `backend/api.py` for HTTP routes and `backend/pipeline.py` for the manufacturing workflow. Public request types live in `schemas.py`; geometry/result conversion lives in `serialization.py`. The numbered modules retain the optical, order, nesting and G-code stages. The implemented classes are `HoleAwareNester` (grid search) and `GCodeCompiler`; old Python names remain compatibility aliases. Chat providers use sequential failover, with no parallel blackboard in the execution path.
+Read `backend/api.py` for HTTP routes and `backend/pipeline.py` for the manufacturing workflow. Public request types live in `schemas.py`; geometry/result conversion lives in `serialization.py`. The numbered modules retain the optical, order, nesting and G-code stages. The implemented classes are `HoleAwareNester` (NFP contact placement plus bounded simulated annealing) and `GCodeCompiler`; old Python names remain compatibility aliases. Baseten is the default order parser; Fireworks supplies transport failover and one guarded repair of a rejected complete-order extraction. Independent local nesting searches run in parallel; no three-cloud blackboard sits in the execution path.
+
+The [application promise audit](docs/architecture/APPLICATION_PROMISE_AUDIT.md) records the recovered application wording, implementation evidence and outstanding commitments. The backend now includes parallel NFP/annealing search, real Muse Code-prepared emitters and optional checked arc lead-ins. The [repository audit](docs/architecture/REPOSITORY_AUDIT.md) explains the winner-source review, simplifications and remaining limits. The [physical validation protocol](docs/architecture/PHYSICAL_VALIDATION.md) separates routine photo indexing from independent ruler measurements used only for testing.
 
 ## Start on Windows
 
@@ -86,15 +88,46 @@ Use your real printed station and measured cardboard. Keep the sheet flat and ma
 
 ## Material and controller boundaries
 
-Material identity is exact: `ss304`, `ss316`, `a36`, `al6061`, `al5052`, `stainless_steel`, `mild_steel`, `carbon_steel`, `steel` and `aluminum` remain distinct. Unknown material/grade labels stay distinct instead of being reduced to a familiar family. Thickness matching defaults to ±0.01 mm. A grade explicitly requested in a prompt cannot be downgraded by the model. Material grades already lost by an older version cannot be recovered automatically; relabel or reindex that stock using its actual specification.
+Material identity is exact: `ss304`, `ss316`, `a36`, `al6061`, `al5052`, `stainless_steel`, `mild_steel`, `carbon_steel`, `steel` and `aluminum` remain distinct. Unknown material/grade labels stay distinct instead of being reduced to a familiar family. Thickness matching defaults to ±0.01 mm. A grade explicitly requested in a prompt cannot be downgraded by the model. Missing or contradictory inputs require clarification before a model call; a rejected complete extraction can receive one Fireworks repair, which must pass the same checks. Material grades already lost by an older version cannot be recovered automatically; relabel or reindex that stock using its actual specification.
 
-The implemented controller profile is **ISO_6983_GRBL, targeting GRBL 1.1 laser mode**. It emits `G21`, `G90`, `G94`, `G00`, `G01`, `G04`, `M03`, `M05`, `M30`. G94 explicitly establishes feed per minute. The verifier rejects unsupported opcodes and parameters, malformed/duplicate words, active-laser rapids, missing setup/end state, open contours, and cuts differing from the planned sequence. It checks the exact final postprocessed text before export/commit. Proprietary controller names, including Fanuc and Trumpf, fail with an unsupported-profile error; changing comments does not implement a controller.
+Implemented profiles are **ISO_6983_GRBL** (GRBL 1.1 laser mode) and **LINUXCNC_LASER** (operator-qualified M3/M5 laser mapping). They use real Muse Code-prepared emitters stored with provenance in `backend/postprocessors/`. LinuxCNC establishes G61 exact-path mode and uses M2 program end. The bounded command set includes `G21`, `G90`, `G94`, `G17`, `G91.1`, `G61`, `G00`, `G01`, `G02`, `G03`, `G04`, `M03`, `M05`, `M2`, `M30`. G94 explicitly establishes feed per minute. The verifier rejects unsupported opcodes and parameters, malformed/duplicate words, active-laser rapids, missing setup/end state, open contours, and cuts differing from the planned sequence. It checks the exact final postprocessed text before export/commit. Proprietary controller names, including Fanuc and Trumpf, fail with an unsupported-profile error. A requested quarter-circle lead-in must fit in waste, clear of stock holes and other parts; an unsafe request fails. Lead-in footprints and kerf are subtracted from predicted stock in the original inventory coordinate frame.
 
 Output uses **centerline contours**. Kerf reserves placement clearance and predicted stock loss; it does not implement dimensional cutter compensation. The operator must qualify feed, power and dwell for the actual machine/material, configure GRBL `$32=1` and `$30=1000`, and establish the work origin at the reported physical sheet vertex. These settings are documented prerequisites, not machine configuration performed by the API. The application does not validate hold-downs, lens distortion, Z clearance, gas systems, thermal effects or cut completion. No machine is connected or run by this backend.
 
+## Search, lead-ins and prepared emitters
+
+`execute-pipeline` accepts `search_iterations` (default 2 per chain, 0..100),
+`search_workers` (default 2, 1..4) and `search_seed` (default 17). Identical-shape
+orders or disabled annealing use one search rather than duplicate work. The response
+records actual workers, evaluated layouts and whether the result is globally optimal
+(always false). Legacy `coarse_step_mm` / `fine_step_mm` remain accepted for old
+clients but do not control NFP placement.
+
+Set `lead_in_radius_mm` above zero to request quarter-circle pierce approaches;
+the default is zero. `cut_feedrate_mm_min`, `laser_power_s` and `pierce_delay_sec`
+are explicit process inputs. Defaults are demonstrative settings, not recommendations
+for a material or machine. Final verification checks the configured values as well
+as coordinates. Arcs are limited to XY centre format with incremental I/J and
+sweeps up to 180 degrees; their conservative sampling envelope is checked too.
+
+The shipped emitters were generated by real Muse Code and validated. They need no
+live coding agent at backend startup or per job. To prepare a replacement deliberately
+(uses Meta credits and requires the official Muse Code CLI):
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.prepare_postprocessor --profile ISO_6983_GRBL --muse <absolute-path-to-muse.exe>
+```
+
+Only the restricted emitter contract is accepted; final programs must still pass
+verification. There is no endpoint that executes uploaded Python. Set
+`REMNANTX_ORDER_PROVIDER=meta` to use Muse Spark 1.3 directly for order interpretation,
+or retain the default `baseten` for Muse Spark Open. Stock filtering remains local
+and authoritative. The original one-million-token inventory-prompt proposal was
+not adopted; the reason and exact deviation are recorded in the application audit.
+
 ## Timings, metrics and tests
 
-Responses contain measured stage times, counts, input usable area, placed solid area and area utilization. Financial and CO₂ savings are null until there is a measured equivalent-production baseline, procurement prices and explicit lifecycle assumptions. A fast result or high packing utilization does not supply those assumptions. Nesting is a deterministic grid/rotation search, not a proof of global optimality.
+Responses contain measured stage times, counts, input usable area, placed solid area and area utilization. Financial and CO₂ savings are null until there is a measured equivalent-production baseline, procurement prices and explicit lifecycle assumptions. A fast result or high packing utilization does not supply those assumptions. Nesting uses NFP contact placement and seeded parallel simulated annealing, not a proof of global optimality. GEOS uses double precision. NFP work is bounded to 4,096 vertices per decomposition, 20,000 convex pairs and 500,000 edge operations; excessive complexity fails explicitly.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
@@ -103,5 +136,9 @@ Responses contain measured stage times, counts, input usable area, placed solid 
 The test suite disables cloud credentials inside the test process. It includes geometry, second-sheet verification failure, final-program tampering, actual SQL rollback, stale plans/materials, disconnected stock, grade separation, DXF rejection, upload-to-50-parts, SAM wire decoding, interrupted streams, synthetic photo dimensions and persisted demo/local provenance. The live SAM smoke test is separate and opt-in.
 
 **Backend milestone validation:** 81 tests passed. A separate live SAM box-prompt check returned a decoded mask, and local server startup was exercised with disposable demo inventory. Physical station accuracy and real-machine process qualification remain pending.
+
+**Local validation on 29 October 2026:** 164 tests passed. Coverage includes 101 distinct uploaded synthetic DXFs in one verified order, a separate 105-instance mixed batch, parallel search, both prepared emitters, arc/process tampering, lead-in inventory coordinates and atomic rejection. The 101-file test took about 60 seconds including file generation, uploads, execution and assertions; this is not a nesting-only latency or a speed guarantee. These results extend the initial backend milestone; the physical-capture follow-up below records subsequent validation.
+
+**Physical-capture follow-up:** 167 offline tests now pass after fixing unnecessary NFP decomposition and lead-in rejection on dense circle chords. The actual calibrated cardboard image returned one sheet and one L-shaped hole; natural-language orders, mixed nesting, verified output and a predicted inventory update were exercised in isolated test storage. The user physically remeasured and corrected the hole-offset references to 73/69 mm top/left; baseline extraction is 73.46/68.65 mm without adjustment. Exterior dimensions still differ by up to 4.7 mm from the ruler reference. See the [measured capture report](docs/architecture/PHYSICAL_VALIDATION_20261029.md); this is not overall physical accuracy acceptance.
 
 Primary protocol references: [Meta segmentation](https://dev.meta.ai/docs/sam/segmenting), [mask grammar](https://dev.meta.ai/docs/sam/reading-segmentation), [official parser](https://dev.meta.ai/docs/sam/client-libraries), [GRBL supported modes](https://github.com/gnea/grbl/wiki), [GRBL laser mode](https://github.com/gnea/grbl/blob/master/doc/markdown/laser_mode.md).

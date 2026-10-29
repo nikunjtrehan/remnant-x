@@ -196,7 +196,8 @@ def test_phase_b_complete_factory_lifecycle(tmp_path):
     # Usable area of REMNANT_SMALL_A must have decreased after committing Job #1
     assert updated_a.usable_area_mm2 < rec_a.usable_area_mm2
 
-    # Now submit Job #2 (two tiny 28mm disks) specifically targeting updated REMNANT_SMALL_A
+    # Job #2 reuses updated stock, spilling to another compatible sheet if the
+    # first job's valid layout leaves insufficient space on that particular sheet.
     order_2 = orchestrator.validate_and_parse_order_dict(
         {
             "order_id": "JOB_002_FOLLOWUP",
@@ -209,12 +210,14 @@ def test_phase_b_complete_factory_lifecycle(tmp_path):
         }
     )
     plan_2 = orchestrator.orchestrate_order_plan(order_2)
-    nest_2 = nester.nest_batch_across_sheets([updated_a], plan_2.cad_part_specs)
+    nest_2 = nester.nest_batch_across_sheets(plan_2.candidate_sheets, plan_2.cad_part_specs)
 
     assert nest_2.status == "COMPLETE"
+    assert any(o.sheet_id == "REMNANT_SMALL_A" for o in nest_2.sheet_outcomes)
     assert nest_2.total_placed == 2
 
     # Prove that Job #2's parts have 0.00 mm2 overlap with ALL of Job #1's committed parts!
-    for p2 in nest_2.sheet_outcomes[0].placed_parts:
+    reused = next(o for o in nest_2.sheet_outcomes if o.sheet_id == "REMNANT_SMALL_A")
+    for p2 in reused.placed_parts:
         for old_cut_poly in cut_polys_job1:
             assert p2.polygon.intersection(old_cut_poly).area == 0.0

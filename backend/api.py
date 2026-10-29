@@ -44,7 +44,7 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
     app = FastAPI(
         title="RemnantX Industrial Spatial AI Backend",
         version="1.0.0",
-        description="Optical ArUco/SAM 3.1 Remnant Indexer, Muse Spark Open BOM Orchestrator, Hole-Aware Grid Nester & Verified CNC G-Code Compiler",
+        description="ArUco/SAM remnant indexing, Muse Spark order parsing, parallel NFP/annealing nesting and verified controller output",
     )
 
     app.add_middleware(
@@ -97,6 +97,7 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
             "status": "ok",
             "service": "RemnantX Backend",
             "providers": {
+                "primary_order_provider": llm.order_provider,
                 "baseten_configured": llm.has_baseten,
                 "baseten_model": llm.baseten_model,
                 "meta_configured": llm.has_meta,
@@ -286,6 +287,8 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
                 },
                 "llm_trace": orch.last_llm_trace,
             }
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 

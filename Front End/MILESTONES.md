@@ -109,3 +109,35 @@ Results are added after each milestone passes its checks.
 - Public workflow semantics and limitations are in `WORKFLOW_GUIDE.md`; subjective
   ratings remain in private local notes. No paid batch inference or publication
   was performed.
+
+### Milestone 6 · Durable backend reviews and exact plans
+
+- Two tables in the existing SQLite database retain immutable optical reviews
+  and complete verified cut plans. No additional backend service is introduced.
+- Reviewed analysis stays outside usable inventory until explicit acceptance.
+  Stable IDs recover completed work; acceptance cannot overwrite physical stock.
+- Current-stock checks flag outdated plans. Exact-plan confirmation applies saved
+  footprints and its replay receipt in the same transaction, without renesting.
+- Location metadata survives cuts and disconnected-island records.
+- **184 offline backend tests pass**, including the eight review-workflow cases.
+
+### Milestone 7 · Factory-facing review, recovery and identification
+
+- Missing-marker corners are named and highlighted, calibration problems have
+  distinct guidance, and failed photos have targeted replacement/setup actions.
+- Photo/geometry overlays, zoom and explicit visual acceptance cover outline and
+  hole inspection. The border guard blocks a truncated outline.
+- Physical stock IDs, rack/slot editing and printable labels connect inventory
+  selection to the sheet a worker retrieves.
+- IndexedDB preserves original photos; local storage preserves job drafts and
+  views. Backend reviews/receipts reconcile completed work without automatic AI
+  retries. StrictMode hydration and removal of a selected batch photo are covered.
+- Program download checks current stock. Operator completion uses the exact
+  stored plan; downloads and physical completion are separate states.
+- **41 frontend tests, TypeScript and production build pass.** The isolated
+  browser exercise covered the factory scenarios recorded in VALIDATION.md.
+- The earlier desktop replan action is superseded by this exact-plan flow.
+  Legacy direct API clients retain their documented contract.
+- No paid model request, production inventory update or GitHub publication was
+  performed. Visual quality checks and the remaining operating limits are
+  documented in FACTORY_SCENARIOS.md.

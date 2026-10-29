@@ -37,7 +37,9 @@ FastAPI. Hosting and GitHub publication are separate future steps.
 - **Live scanner:** save station spans and black marker size; choose a photograph;
   inspect actual detected markers and rectified preview. Missing markers or bad
   calibration block analysis. An optional box can target the sheet in rectified
-  pixels. “Analyze & add to inventory” calls real SAM and saves that one result.
+  pixels. “Analyze for geometry review” calls SAM and stores a pending review.
+  Compare the outline and holes over the calibrated photograph, then accept it
+  before it becomes available stock. Rejected geometry can be recaptured or refined.
 - **Batch photos / ZIP:** import loose JPEG/PNG photos or a ZIP, up to 50 photos,
   20 MB per image and 100 MB total. Configure shared defaults, inspect per-photo
   overrides, check pending photos, then analyze the ready ones. Bad photos remain
@@ -49,21 +51,31 @@ FastAPI. Hosting and GitHub publication are separate future steps.
 - **Result:** inspect sheets, parts, kerf zone, planned cut sequence and final
   verification. A partial batch remains visibly partial and cannot update stock.
   Changing order inputs invalidates the earlier result.
-- **Stock update:** “Replan & update stock” explains the existing API behavior,
-  reruns against current stock, then displays the newly returned plan. It records
-  predicted remaining material, not physical fabrication.
+- **Stock identity:** enter the ID written on the physical sheet and its rack/slot.
+  Inventory can update locations and download printable SVG labels. The cutting
+  plan identifies the physical sheet to retrieve. Different photographs do not
+  prove different physical stock.
+- **Stock update:** “Record completed cut” requires the operator to confirm use
+  of the exact saved program. Current stock must match the saved snapshot. The
+  backend atomically updates all sheets from that stored plan without renesting.
+  A download alone never confirms cutting. Remaining geometry is still predicted;
+  there is no machine connection or automatic physical-cut verification.
 
 Single and batch capture share one station profile, persisted in browser local
 storage. A batch processes sequentially through the existing API. Each accepted
 sheet is saved independently; this intake is not one atomic warehouse transaction.
 The manufacturing batch commit retains its existing all-sheets verification and
 atomic transaction. “Stop after current photo” does not cancel a running request.
-Exact duplicate image bytes are detected; different views of the same physical
-sheet must not be entered as separate stock. Live job drafts and photo queues survive
-navigation and example/live switching within the open page; they are not saved
-across reloads. Keep the page open during requests. There is no backend job
-recovery/cancellation API. Errors retain inputs; a connection failure during a
-write requires refreshing inventory before retrying.
+Exact duplicate image bytes are detected in the queue and across reviewed scans
+on the backend. Live job drafts use local storage; original single/batch photo
+files and metadata use IndexedDB. Views and capture mode restore after reload.
+Recovery never restarts model inference automatically. Completed analyses and
+cut plans are stored in SQLite with stable IDs; acceptance and cut-confirmation
+retries replay their durable result. Pending geometry can also be recovered from
+Inventory if the local queue is unavailable. Storage failures are shown explicitly.
+Recovery requires the same browser origin and backend database. Clearing browser
+data removes unsent photos; an interrupted server computation may need an explicit
+retry. There is no background job service or cancellation of an active model call.
 
 ## Reproduce the recorded example
 
@@ -87,5 +99,7 @@ plain CSS; the app has no additional backend, agent framework or 3D dependency.
 
 See [VALIDATION.md](VALIDATION.md) for the checks and remaining integration limits.
 The [workflow guide](WORKFLOW_GUIDE.md) explains batch behavior and design decisions.
+The [factory scenario matrix](FACTORY_SCENARIOS.md) distinguishes automatic
+guards, operator checks and remaining deployment limits.
 
 See [MILESTONES.md](MILESTONES.md) for scope and validation checkpoints.

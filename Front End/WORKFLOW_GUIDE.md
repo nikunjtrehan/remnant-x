@@ -9,6 +9,9 @@
 | Multiple remnant photos | Yes; independent checks, settings, results and warehouse saves in one intake queue |
 | ZIP of remnant photos | Yes; JPEG/PNG files, including folders inside the archive |
 | Many sheets in a manufacturing order | Yes; existing backend nesting and verification remain authoritative |
+| Review before stock eligibility | Yes; the desktop stores a pending analysis, overlays geometry on its photograph, and requires explicit acceptance |
+| Physical sheet IDs and rack/slot | Yes; stored location, printable stock labels, and sheet identity on the plan |
+| Refresh recovery | Yes; browser photo files/drafts plus durable backend reviews and verified plans |
 | Many disconnected sheets inside one photograph | Not supported by this indexing contract; use one photograph per distinct remnant |
 
 For example: “Make 50 copies of the uploaded DXF from 3 mm ss304 sheet, kerf 1 mm.”
@@ -19,8 +22,9 @@ uploads. Missing job inputs still require clarification.
 
 Every stock photograph must include the station's four markers. The queue uses
 the same saved station configuration as single-photo capture. Per-photo material,
-thickness, concept and optional rectified-image box remain editable. A station
-change invalidates pending calibration checks and region boxes.
+thickness, concept and optional rectified-image box are editable before analysis.
+A station change invalidates unchecked-photo calibration and region boxes.
+Completed reviews retain their immutable image, geometry and calibration frame.
 
 ## Research applied
 
@@ -57,13 +61,38 @@ establish which individual feature caused a win.
   photo per distinct inventory item.
 - Checks and segmentation run sequentially through the existing endpoints. Batch
   means a queue of many independent sheets, not parallel cloud inference.
-- Each successful photo is saved independently. A bad photo remains visible;
-  completed photos are skipped on subsequent checks/analysis.
+- Each successful analysis becomes a pending review, outside usable inventory.
+  The operator accepts or rejects individual geometry; accepted sheets save
+  independently. Bad photos remain visible and completed analyses are not repeated.
 - “Stop after current photo” stops before the next request. It does not claim to
   cancel an already running server/model call.
-- Refreshing the page loses this local queue. A durable server job system is not
-  part of this desktop milestone. Downloadable batch reports contain statuses and
-  inventory IDs; a network error during a save requires checking inventory.
+- Original files and lightweight queue metadata are checkpointed in IndexedDB;
+  job drafts and view preferences use local storage. Large review images are
+  loaded from the backend rather than duplicated in every browser checkpoint.
+- Durable reviews and verified plans use two tables in the existing SQLite DB.
+  Stable request IDs prevent completed work being repeated during recovery.
+  Geometry acceptance and exact-plan confirmation are replay-safe transactions.
+- A refresh restores saved work without automatically starting inference.
+  Browser quota/storage failures show a warning. Browser data clearing, another
+  browser origin and a backend computation interrupted before a result was
+  stored are outside automatic recovery.
+
+## Exact reviewed plans
+
+The desktop supplies a plan ID to `/execute-pipeline`. Complete verified output,
+original stock snapshots and cut footprints are saved together. Program download
+checks the current stock; stale output is labelled outdated and blocked.
+`POST /verified-plans/{plan_id}/confirm` requires `operator_confirmed=true`.
+It applies the saved footprints and stores its receipt in the same transaction.
+Retries return that receipt; they do not renest or subtract stock twice.
+Completion is operator-reported and remaining stock is a geometric prediction.
+
+The older direct API contracts remain available: `save_to_warehouse=true` indexes
+without the desktop review step; `commit_cuts_to_db=true` executes and commits a
+newly generated batch. The desktop uses neither shortcut. Reviewed scans send
+`save_to_warehouse=false` and `review_id`; reviewed plans use the separate
+confirmation endpoint. This preserves existing automation clients while giving
+the desktop explicit human review.
 
 ## Validation boundaries
 
@@ -80,3 +109,6 @@ one blocked for a missing marker. The uploaded-DXF prompt was exercised with the
 real deterministic fallback, nesting and final verification. No paid inference or
 production inventory was used. These tests establish workflow behavior, not
 new SAM accuracy or live multi-photo cloud throughput.
+
+See [FACTORY_SCENARIOS.md](FACTORY_SCENARIOS.md) for operating scenarios and
+the distinction between automated checks and required visual inspection.

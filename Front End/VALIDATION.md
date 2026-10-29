@@ -2,71 +2,73 @@
 
 ## Automated checks
 
-- `npm run check`: **29 frontend tests passed**, followed by TypeScript and Vite production build.
-- Complete offline Python suite: **176 passed in 85.58 seconds**. Seven earlier API
-  checks cover preflight, all four missing-marker cases, unchanged indexing
-  rejection, calibration failures and managed DXF download boundaries. One
-  existing Starlette/httpx deprecation warning remains.
-- Two additional API regressions prove the uploaded-DXF “make 50 copies” wording
-  and the existing “cut 50 of” wording preserve quantity, material grade and file
-  binding when the cloud is unavailable.
-- Dependency audit at installation: zero known vulnerabilities after upgrading
-  the test runner to patched Vitest 4.1.12. Resolved versions are in the lockfile.
+- `npm run check`: **41 frontend tests passed**, followed by TypeScript and
+  Vite production build. The suite includes actual IndexedDB file round trips,
+  immutable review approval/retry, rejected-review recovery, StrictMode draft
+  hydration, retained workspace mode, stale export blocking and preservation of
+  material edits after removing the selected photo.
+- Full offline backend suite: **184 passed in 70.15 seconds**. The eight new
+  review-workflow tests cover approval eligibility, replay-safe acceptance,
+  physical-ID collisions, rejected/cropped review refusal, restart recovery,
+  exact-plan confirmation without renesting, stale batch rollback, location
+  integrity, duplicate photo refusal and stale-plan reporting.
+- One existing Starlette/httpx deprecation warning remains.
+- Dependency installation audit: zero known vulnerabilities. The new
+  `fake-indexeddb` package is a development-only test dependency.
 
-## Browser checks against the real API
+## Current factory browser exercise
 
-The API ran with a separate database and artifact directory under
-`.task-tmp/frontend-dev`. No production warehouse, environment file, private
-physical photo or provider credit was used for these checks.
+The UI used an isolated origin/port, database and artifacts under
+`.task-tmp/factory-qa`. Perception was explicitly replaced with local-threshold
+geometry in an ignored test harness; order-provider calls were disabled. Marker
+calibration, vectorization, durable reviews, inventory writes, DXF loading,
+nesting, final program verification and saved-plan confirmation used real code.
 
 | Scenario | Observed outcome |
 | --- | --- |
-| Explicit demo seeding | Confirmation explains the reset; three tagged demo sheets loaded |
-| Structured order: eight rectangles | 8/8 placed, verified program, preview did not update stock |
-| Predicted-stock action | Replan explanation shown; atomic update returned and newly planned result displayed |
-| Photo missing marker 2 | Actual 3/4 detections, marker location/retake guidance, analysis blocked |
-| Complete synthetic station at its matching dimensions | 4/4 detected; calibration check passed; rectified preview shown |
-| Optional SAM region | Dragged box produced a region prompt in the rectified frame |
-| Upload one DXF, quantity 50 | 50/50 placed and verified; browser downloaded the actual `.nc` program |
-| 101 distinct DXFs, one instance each | Imported through the production UI with bounded concurrency; 101/101 placed and software verified; preview remained non-mutating |
-| Planned toolpath playback | Active point rendered; pause and reset controls worked; playback labeled separately from a live machine |
-| Guided example | Source image, extracted hole, placements and verified path can be stepped through; complete result is accessible without waiting |
-| Desktop layout | Batch UI checked at 1024 × 768 and 1440 × 900 without horizontal document overflow; viewport override reset afterward |
-| ZIP photo intake | Three synthetic station photos imported; real calibration accepted two and blocked the missing-marker image; offline perception saved the two valid sheets independently |
-| Repeated ZIP import | The same archive imported again produced three duplicate notices and kept the queue at three photos |
-| DXF plus a prompt | “Make 50 copies of the uploaded DXF from 3 mm steel sheet, kerf 1 mm” parsed through the real offline fallback; 50/50 parts nested and verified |
+| Three photos in one ZIP | Two valid captures and one missing-marker rejection; the other photos were retained |
+| Marker 2 missing | Bottom-right corner named, highlighted red, analysis disabled, replacement/setup actions visible |
+| Analyze two ready photos | Two pending geometry reviews, two perception calls, zero available inventory records |
+| Refresh before acceptance | Original photos and pending reviews restored; perception count remained two |
+| Visual acceptance | Checkbox required before acceptance; stock became available only after accepting geometry |
+| Review recovered through Inventory | Second pending review opened and accepted without another perception call |
+| Physical IDs and locations | Two stable IDs saved; location edited and the printable SVG contained the saved ID, grade, thickness, current location and test-stock marking |
+| Vendor DXF plus “make 50 copies” | Actual deterministic fallback produced quantity 50; 50/50 nested and software verified |
+| Refresh a verified job | Live view, job quantity, uploaded-file references and stable plan ID restored; saved result recovered without renesting |
+| Operator-reported completion | Explicit declaration required; exact saved plan updated predicted stock atomically |
+| Another worker changes stock | A separate test transaction changed the selected sheet; subsequent export and completion were both blocked and the plan labelled outdated |
+| Replan against current stock | A fresh valid plan completed the browser download event for its verified program |
+| Laptop layout | 1024 × 768 checked without horizontal document overflow; temporary viewport restored after testing |
 
-The ZIP save test used `.task-tmp/frontend-upgrade/offline_api.py`: a private
-test-only API replacing perception with explicit local-threshold geometry and
-disabling model requests. It used a separate database and never changes the
-production API implementation. Frontend regressions additionally cover SHA-256
-duplicate-image rejection, import/expansion limits, material requirements,
-per-file partial success, completed-photo repeat prevention, stop-after-current,
-shared station settings, multi-field calibration editing without losing the open
-setup panel, and pre-analysis inventory-ID collisions. This is not a
-live multi-photo SAM accuracy or provider-throughput test.
+Browser testing exposed a development StrictMode hydration bug. Persistence now
+waits for the restored state to commit; a regression runs the same remount
+behaviour. No empty draft overwrites the stored job.
 
-A development-server restart interrupted an earlier large-batch viewing session.
-The 101-file flow was repeated on the stable production preview and its final
-101/101 verified state was observed in the browser. This is functional evidence,
-not a latency benchmark or a claim of globally optimal placement.
+## Earlier milestone evidence retained
+
+The preceding frontend milestones exercised 101 distinct uploaded DXFs, a
+separate 50-copy upload order, partial results, explicit demo seeding, per-sheet
+downloads, planned-path playback and the recorded guided example. Those checks
+are functional evidence, not a throughput benchmark or a claim of optimal
+packing. The older desktop replan-and-commit action has been replaced by the
+saved-plan confirmation flow above.
 
 ## Scope and limits
 
-- The real SAM UI request is wired to the existing indexing endpoint. This build
-  used mocked inference in interaction tests and the previously validated backend
-  transport/geometry suite; no new paid end-to-end SAM or order-provider call was
-  made during frontend construction.
-- The public recording is explicitly **synthetic / local_threshold**, not a SAM
-  accuracy experiment. The original physical photographs remain private.
-- Stage events and cancellation do not exist in the API. Live requests show an
-  activity indicator and actual elapsed time, followed by the real result/error.
-- The stock-update API re-plans; the UI explains that contract. A future
-  exact-preview commit needs a stable backend plan identifier and stale rejection.
-- Live drafts and photo batches are session UI state. They survive navigation/mode switches, not
-  page reloads. Server-side recovery is outside this milestone.
-- Desktop/laptop is the intended initial surface. Mobile capture, authentication,
-  public deployment and machine qualification are outside this local prototype.
-- Software verification and the occupation percentage are the backend's planned
-  geometry checks/metrics. They do not certify physical dimensions, achieved cut
-  quality, financial savings or CO₂ savings.
+- No new live SAM accuracy or paid provider test was performed in this exercise.
+  The public example is synthetic/local-threshold; physical test photos remain
+  private.
+- Glare, blur, occlusion, overlap and flatness require the documented visual
+  checks. Automatic dimensional or image-quality certification is not claimed.
+- Browser recovery requires available storage and the same origin. Clearing
+  browser data removes unsent files. Completed backend reviews remain recoverable
+  from the same database; interrupted computations are not durable worker jobs.
+- No active-call cancellation, factory-wide sheet reservation, public deployment,
+  authentication or machine telemetry is added by this milestone.
+- The legacy direct API auto-save/commit contracts remain available to trusted
+  callers. The desktop uses explicit review and exact-plan confirmation.
+- Verified program geometry and predicted remaining stock do not certify
+  physical dimensions, process qualification, achieved cut quality or savings.
+
+See [FACTORY_SCENARIOS.md](FACTORY_SCENARIOS.md) for the operating matrix and
+[WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) for API/recovery semantics.

@@ -23,11 +23,18 @@ Open the printed local address, normally **http://127.0.0.1:5173**. Both process
 must be running for live work. The recorded example works with the frontend alone.
 Provider credentials remain on the backend. Use Node 22.12 or newer.
 
-Frontend changes were developed as four local milestones; see the
+Frontend changes were developed as reviewable local milestones; see the
 [milestone record](Front%20End/MILESTONES.md) and
-[validation notes](Front%20End/VALIDATION.md). The live inventory-update action is
-explicitly a replan followed by an atomic predicted-stock update; it does not
-claim to commit exactly the earlier preview or operate a machine.
+[validation notes](Front%20End/VALIDATION.md). Desktop scans require visual
+geometry acceptance before stock becomes available. Physical IDs, rack/slot
+labels and refresh recovery support the workflow. The desktop saves complete
+verified plans and applies their exact footprints after operator-reported cut
+completion, with stale rejection and replay-safe receipts. It does not control
+a machine. [Factory scenarios and limits](Front%20End/FACTORY_SCENARIOS.md)
+distinguish automatic guards from operator checks.
+
+The [review and recovery decisions](docs/architecture/FACTORY_REVIEW.md) explain
+the visual acceptance step, exact-plan receipts and local recovery design.
 
 Read `backend/api.py` for HTTP routes and `backend/pipeline.py` for the manufacturing workflow. Public request types live in `schemas.py`; geometry/result conversion lives in `serialization.py`. The numbered modules retain the optical, order, nesting and G-code stages. The implemented classes are `HoleAwareNester` (NFP contact placement plus bounded simulated annealing) and `GCodeCompiler`; old Python names remain compatibility aliases. Baseten is the default order parser; Fireworks supplies transport failover and one guarded repair of a rejected complete-order extraction. Independent local nesting searches run in parallel; no three-cloud blackboard sits in the execution path.
 

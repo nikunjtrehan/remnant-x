@@ -87,3 +87,25 @@ Results are added after each milestone passes its checks.
   verified placements, real marker rejection/pass, region selection and playback.
 - See `VALIDATION.md` for the observed checks, development-reload rerun and limits.
   No private photograph, production database or provider credential is included.
+
+### Milestone 5 · Batch intake and usability review
+
+- Added loose-photo and browser-side ZIP intake, a thumbnail/status queue, shared
+  station calibration, batch defaults and per-photo overrides. Import limits are
+  50 photos, 20 MB per image and 100 MB total. Exact duplicate bytes are skipped.
+- Calibration gates each photo; only ready photos with explicit material/thickness
+  can reach analysis. Existing inventory-ID collisions block analysis. Successful
+  sheets save independently; blocked/failed photos stay visible. Stopping waits
+  for the current request and does not pretend to cancel it.
+- Improved the upload-plus-prompt instructions, stock-import entry, initial result
+  summary, field sizes and secondary-text contrast while retaining the original
+  geometry workspace and recorded walkthrough.
+- Fixed the bounded offline DXF quantity rule for “50 copies of the uploaded DXF”.
+  Material/intent checks and the multiple-upload clarification boundary remain.
+- **29 frontend tests, 176 offline backend tests, TypeScript and production build
+  pass.** Browser checks imported three synthetic photos from a ZIP (two accepted,
+  one missing-marker rejection) and saved the accepted pair through a private
+  offline perception harness. A DXF prompt produced a 50/50 verified cutting plan.
+- Public workflow semantics and limitations are in `WORKFLOW_GUIDE.md`; subjective
+  ratings remain in private local notes. No paid batch inference or publication
+  was performed.

@@ -305,11 +305,18 @@ export function Plan({
                       setTrace(null);
                       invalidate();
                     }}
-                    placeholder="Cut 8 plates, 50 × 30 mm, and 4 discs, diameter 20 mm, from 3 mm steel. Kerf 1 mm."
+                    placeholder={
+                      uploads.length === 1
+                        ? "Make 50 copies of the uploaded DXF from 3 mm ss304 sheet. Kerf 1 mm."
+                        : "Cut 8 plates, 50 × 30 mm, and 4 discs, diameter 20 mm, from 3 mm steel. Kerf 1 mm."
+                    }
                   />
                   <p className="hint">
-                    Include quantity, dimensions, thickness and exact material
-                    grade.
+                    {uploads.length === 1
+                      ? `Attached: ${uploads[0].filename}. Describe the quantity, material and thickness; the DXF supplies the shape.`
+                      : uploads.length > 1
+                        ? "DXFs are attached. Use the parts list below to assign each file its own quantity."
+                        : "Include quantity, dimensions, thickness and exact material grade."}
                   </p>
                   <button
                     className="button primary full"
@@ -413,22 +420,47 @@ export function Plan({
                 ))}
               </div>
               {!!uploads.length && (
-                <button
-                  className="button secondary full"
-                  disabled={
-                    !!busy ||
-                    uploads.some(
-                      (u) =>
-                        !Number.isInteger(u.quantity) ||
-                        u.quantity < 1 ||
-                        u.quantity > 10000,
-                    )
-                  }
-                  onClick={fromUploads}
-                >
-                  Use {uploads.reduce((n, u) => n + u.quantity, 0)} uploaded
-                  parts <ChevronRight size={14} />
-                </button>
+                <>
+                  <button
+                    className="button secondary full"
+                    disabled={
+                      !!busy ||
+                      uploads.some(
+                        (u) =>
+                          !Number.isInteger(u.quantity) ||
+                          u.quantity < 1 ||
+                          u.quantity > 10000,
+                      )
+                    }
+                    onClick={fromUploads}
+                  >
+                    Use {uploads.reduce((n, u) => n + u.quantity, 0)} uploaded
+                    parts <ChevronRight size={14} />
+                  </button>
+                  <button
+                    className="text-button upload-prompt-link"
+                    disabled={!!busy}
+                    onClick={() => {
+                      setInputMode("prompt");
+                      setTimeout(
+                        () =>
+                          document
+                            .getElementById("manufacturing-prompt")
+                            ?.focus(),
+                        0,
+                      );
+                    }}
+                  >
+                    Or describe this uploaded job in a prompt →
+                  </button>
+                  {uploads.length === 1 && (
+                    <p className="hint">
+                      For example: “Make 50 copies of the uploaded DXF from 3 mm
+                      ss304 sheet, kerf 1 mm.” Use the actual material and
+                      thickness of your stock.
+                    </p>
+                  )}
+                </>
               )}
               <details className="contract-note">
                 <summary>What DXF files can I use?</summary>

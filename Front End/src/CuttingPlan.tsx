@@ -94,6 +94,16 @@ export function CuttingPlan({
                   : "Some parts still need a home."
                 : "Room for your next idea."}
             </h2>
+            {shownResult && (
+              <p className="result-summary">
+                {shownResult.nesting.total_placed}/
+                {shownResult.nesting.total_requested} parts placed ·{" "}
+                {shownResult.metrics.sheets_used} sheet
+                {shownResult.metrics.sheets_used === 1 ? "" : "s"} ·{" "}
+                {formatNumber(shownResult.metrics.usable_area_utilization_pct)}%
+                usable area occupied
+              </p>
+            )}
           </div>
           <span
             className={`badge ${shownResult ? (complete ? "good" : "warn") : "neutral"}`}

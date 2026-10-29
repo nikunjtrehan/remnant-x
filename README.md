@@ -6,7 +6,7 @@ Desktop workbench and backend prototype for photo → remnant inventory → manu
 
 The frontend lives in [Front End](Front%20End/README.md). It provides a recorded
 synthetic example with a guided visual walkthrough, a photo/scanner gate,
-inventory inspection, editable order review, multi-DXF quantities, per-sheet
+loose-photo/ZIP batch intake, inventory inspection, editable order review, multi-DXF quantities, per-sheet
 nesting views and verified downloads. Example mode never substitutes for a live
 request. The example uses actual offline backend output, not a live SAM result.
 

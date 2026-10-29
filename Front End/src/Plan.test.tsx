@@ -125,6 +125,46 @@ async function parseOrder() {
   await screen.findByLabelText("Quantity · DISC");
 }
 describe("order workflow", () => {
+  it("attaches an uploaded DXF to a natural-language request for fifty copies", async () => {
+    vi.mocked(api.upload).mockResolvedValue({
+      filename: "part.dxf",
+      dxf_path: "managed/part.dxf",
+      geometry,
+      hole_count: 0,
+    });
+    vi.mocked(api.parse).mockResolvedValue({
+      order: {
+        ...order,
+        parts: [
+          {
+            part_id: "VENDOR",
+            shape_type: "dxf_file",
+            dxf_path: "managed/part.dxf",
+            quantity: 50,
+          },
+        ],
+      },
+      llm_trace: {},
+    });
+    render(<Plan {...props} />);
+    await userEvent.upload(
+      screen.getByLabelText("Vendor DXF files"),
+      new File(["dxf"], "part.dxf", { type: "application/dxf" }),
+    );
+    await screen.findByText("part.dxf");
+    const prompt =
+      "Make 50 copies of the uploaded DXF from 3 mm ss304 sheet, kerf 1 mm";
+    await userEvent.type(
+      screen.getByLabelText("Manufacturing request"),
+      prompt,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Review order" }));
+    await screen.findByLabelText("Quantity · VENDOR");
+    expect(api.parse).toHaveBeenCalledWith(prompt, ["managed/part.dxf"]);
+    expect(
+      (screen.getByLabelText("Quantity · VENDOR") as HTMLInputElement).value,
+    ).toBe("50");
+  });
   it("requires order review, preserves exact grades and invalidates output on editing", async () => {
     vi.mocked(api.execute).mockResolvedValue(result);
     render(<Plan {...props} />);

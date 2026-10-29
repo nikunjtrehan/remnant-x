@@ -38,6 +38,11 @@ FastAPI. Hosting and GitHub publication are separate future steps.
   inspect actual detected markers and rectified preview. Missing markers or bad
   calibration block analysis. An optional box can target the sheet in rectified
   pixels. “Analyze & add to inventory” calls real SAM and saves that one result.
+- **Batch photos / ZIP:** import loose JPEG/PNG photos or a ZIP, up to 50 photos,
+  20 MB per image and 100 MB total. Configure shared defaults, inspect per-photo
+  overrides, check pending photos, then analyze the ready ones. Bad photos remain
+  visible; successful photos are not repeated. Each photograph must show one
+  distinct remnant and all four station markers.
 - **Live planning:** describe a job and review the parsed order, or build a parts
   list directly. Upload vendor DXFs in batches with independent quantities and
   per-file errors. Review material/grade, dimensions, kerf and controller inputs.
@@ -48,7 +53,13 @@ FastAPI. Hosting and GitHub publication are separate future steps.
   reruns against current stock, then displays the newly returned plan. It records
   predicted remaining material, not physical fabrication.
 
-Station profiles persist in browser local storage. Live job drafts survive
+Single and batch capture share one station profile, persisted in browser local
+storage. A batch processes sequentially through the existing API. Each accepted
+sheet is saved independently; this intake is not one atomic warehouse transaction.
+The manufacturing batch commit retains its existing all-sheets verification and
+atomic transaction. “Stop after current photo” does not cancel a running request.
+Exact duplicate image bytes are detected; different views of the same physical
+sheet must not be entered as separate stock. Live job drafts and photo queues survive
 navigation and example/live switching within the open page; they are not saved
 across reloads. Keep the page open during requests. There is no backend job
 recovery/cancellation API. Errors retain inputs; a connection failure during a
@@ -75,5 +86,6 @@ source review. The walkthrough reuses the same millimetre viewer as live output.
 plain CSS; the app has no additional backend, agent framework or 3D dependency.
 
 See [VALIDATION.md](VALIDATION.md) for the checks and remaining integration limits.
+The [workflow guide](WORKFLOW_GUIDE.md) explains batch behavior and design decisions.
 
 See [MILESTONES.md](MILESTONES.md) for scope and validation checkpoints.

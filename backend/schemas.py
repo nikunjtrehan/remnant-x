@@ -30,6 +30,14 @@ class IndexImageRequest(StationImageRequest):
     segmentation_object_id: Optional[str] = None
     segmentation_box_px: Optional[List[int]] = None
     use_clahe: bool = False
+    review_id: Optional[str] = Field(default=None, min_length=8, max_length=100)
+    location: str = Field(default="", max_length=120)
+
+class StockLocationRequest(RequestModel):
+    location: str = Field(max_length=120)
+
+class ConfirmCutRequest(RequestModel):
+    operator_confirmed: Literal[True]
 
 class NaturalLanguageOrderRequest(RequestModel):
     prompt: str = Field(min_length=1, max_length=20000)
@@ -59,3 +67,4 @@ class FullPipelineRequest(RequestModel):
     laser_power_s: int = Field(default=1000, ge=1, le=1000)
     uploaded_dxf_files: List[str] = Field(default_factory=list)
     allow_demo_stock: bool = False
+    plan_id: Optional[str] = Field(default=None, min_length=8, max_length=100)

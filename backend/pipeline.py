@@ -3,6 +3,7 @@
 This module contains manufacturing orchestration; HTTP transport stays in api.py.
 """
 import time
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, List
 from shapely import affinity
@@ -14,6 +15,7 @@ from backend.m3_nfp_nester import HoleAwareNester
 from backend.m4_muse_gcode import GCodeCompiler
 from backend.schemas import FullPipelineRequest
 from backend.serialization import serialize_compiled_gcode, serialize_remnant, serialize_sheet_outcome
+from backend.review_workflow import get_plan, save_plan
 
 
 def checked_uploads(paths, upload_root: Path):
@@ -31,6 +33,13 @@ def check_order_uploads(spec, upload_root: Path):
 
 
 def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_root: Path) -> Dict[str, Any]:
+    request_hash = hashlib.sha256(req.model_dump_json().encode()).hexdigest()
+    if req.plan_id:
+        if req.commit_cuts_to_db:
+            raise ValueError("ERR_REVIEWED_PLAN: Confirm the reviewed plan using its confirmation endpoint.")
+        cached = get_plan(db, req.plan_id, request_hash)
+        if cached:
+            return cached
     orch = SparkWarehouseOrchestrator(db, llm_client=llm)
     started = time.perf_counter()
     profile = GCodeCompiler.resolve_profile(req.machine_dialect_prompt or req.machine_profile)
@@ -128,7 +137,7 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
     input_area = sum(o.initial_usable_area_mm2 for o in used)
     part_area = sum(p.polygon.area for o in used for p in o.placed_parts)
 
-    return {
+    result = {
         "status": batch_result.status,
         "machine_profile": profile,
         "timings_ms": timings,
@@ -161,3 +170,8 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
         "gcode_programs": compiled_gcodes,
         "committed_remnants": updated_remnants,
     }
+    if req.plan_id and batch_result.total_placed == batch_result.total_requested:
+        result["plan_id"] = req.plan_id
+        save_plan(db, req.plan_id, request_hash, result, pending_cuts, order_spec.kerf_mm,
+                  expected_wkts, {sid: (sheet_map[sid].material, sheet_map[sid].thickness_mm, sheet_map[sid].source) for sid in pending_cuts})
+    return result

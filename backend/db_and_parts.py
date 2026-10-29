@@ -24,6 +24,7 @@ class RemnantRecord:
     polygon: Polygon
     dxf_path: str
     source: str = "supplied"
+    location: str = ""
 
 
 @dataclass
@@ -92,6 +93,10 @@ class RemnantWarehouseDB:
             """)
             if "source" not in {row[1] for row in conn.execute("PRAGMA table_info(remnants)")}:
                 conn.execute("ALTER TABLE remnants ADD COLUMN source TEXT NOT NULL DEFAULT 'supplied'")
+            if "location" not in {row[1] for row in conn.execute("PRAGMA table_info(remnants)")}:
+                conn.execute("ALTER TABLE remnants ADD COLUMN location TEXT NOT NULL DEFAULT ''")
+            conn.execute("CREATE TABLE IF NOT EXISTS intake_reviews (review_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, payload TEXT NOT NULL, accepted INTEGER NOT NULL DEFAULT 0)")
+            conn.execute("CREATE TABLE IF NOT EXISTS verified_plans (plan_id TEXT PRIMARY KEY, payload TEXT NOT NULL, receipt TEXT)")
             conn.commit()
 
     def upsert_remnant(
@@ -102,6 +107,7 @@ class RemnantWarehouseDB:
         polygon: Polygon,
         dxf_path: str = "",
         source: str = "supplied",
+        location: str = "",
     ) -> RemnantRecord:
         if not isinstance(polygon, Polygon) or polygon.is_empty or not polygon.is_valid:
             raise ValueError("ERR_INVALID_REMNANT_POLYGON")
@@ -116,8 +122,8 @@ class RemnantWarehouseDB:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO remnants
-                (sheet_id, material, thickness_mm, outer_area_mm2, usable_area_mm2, hole_count, polygon_wkt, dxf_path, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (sheet_id, material, thickness_mm, outer_area_mm2, usable_area_mm2, hole_count, polygon_wkt, dxf_path, source, location)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     sheet_id,
@@ -129,6 +135,7 @@ class RemnantWarehouseDB:
                     polygon.wkt,
                     dxf_path,
                     source,
+                    location.strip(),
                 ),
             )
             conn.commit()
@@ -143,13 +150,14 @@ class RemnantWarehouseDB:
             polygon=polygon,
             dxf_path=dxf_path,
             source=source,
+            location=location.strip(),
         )
 
     def get_remnant(self, sheet_id: str) -> Optional[RemnantRecord]:
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT sheet_id, material, thickness_mm, outer_area_mm2,"
-                " usable_area_mm2, hole_count, polygon_wkt, dxf_path, source FROM remnants"
+                " usable_area_mm2, hole_count, polygon_wkt, dxf_path, source, location FROM remnants"
                 " WHERE sheet_id = ?",
                 (sheet_id,),
             ).fetchone()
@@ -165,6 +173,7 @@ class RemnantWarehouseDB:
             polygon=wkt.loads(row[6]),
             dxf_path=row[7],
             source=row[8],
+            location=row[9],
         )
 
     def query_compatible_remnants(
@@ -183,7 +192,7 @@ class RemnantWarehouseDB:
             rows = conn.execute(
                 """
                 SELECT sheet_id, material, thickness_mm, outer_area_mm2, usable_area_mm2,
-                       hole_count, polygon_wkt, dxf_path, source
+                       hole_count, polygon_wkt, dxf_path, source, location
                 FROM remnants
                 WHERE material = ?
                   AND ABS(thickness_mm - ?) <= ?
@@ -209,6 +218,7 @@ class RemnantWarehouseDB:
                 polygon=wkt.loads(r[6]),
                 dxf_path=r[7],
                 source=r[8],
+                location=r[9],
             )
             for r in rows
         ]
@@ -235,30 +245,34 @@ class RemnantWarehouseDB:
         """
         if not math.isfinite(kerf_mm) or kerf_mm < 0:
             raise ValueError("ERR_INVALID_KERF")
-        results = []
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            for sheet_id, parts in cuts.items():
-                row = conn.execute("SELECT material, thickness_mm, polygon_wkt, dxf_path, source FROM remnants WHERE sheet_id=?", (sheet_id,)).fetchone()
-                if row is None:
-                    raise ValueError("ERR_SHEET_NOT_FOUND: " + sheet_id)
-                if expected_wkts is not None and row[2] != expected_wkts[sheet_id]:
-                    raise ValueError("ERR_STALE_WAREHOUSE: " + sheet_id)
-                if expected_inventory is not None and (row[0], row[1], row[4]) != expected_inventory[sheet_id]:
-                    raise ValueError("ERR_STALE_WAREHOUSE_MATERIAL: " + sheet_id)
-                sheet = wkt.loads(row[2])
-                if any(p.is_empty or not p.is_valid or not sheet.buffer(0.002).covers(p) for p in parts):
-                    raise ValueError("ERR_INVALID_CUT_FOOTPRINT")
-                updated = sheet.difference(unary_union([p.buffer(kerf_mm / 2) for p in parts]))
-                islands = sorted(updated.geoms, key=lambda g: g.area, reverse=True) if isinstance(updated, MultiPolygon) else [updated]
-                for i, poly in enumerate(islands):
-                    sid = sheet_id if i == 0 else sheet_id + "_island_" + uuid.uuid4().hex[:12]
-                    outer = float(Polygon(poly.exterior).area)
-                    area = float(poly.area)
-                    # An old DXF no longer describes the updated stock.
-                    conn.execute("INSERT OR REPLACE INTO remnants (sheet_id, material, thickness_mm, outer_area_mm2, usable_area_mm2, hole_count, polygon_wkt, dxf_path, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                 (sid, row[0], row[1], outer, area, len(poly.interiors), poly.wkt, "", row[4]))
-                    results.append(RemnantRecord(sid, row[0], row[1], outer, area, len(poly.interiors), poly, "", row[4]))
+            return self._apply_cuts(conn, cuts, kerf_mm, expected_wkts, expected_inventory)
+
+    def _apply_cuts(self, conn, cuts, kerf_mm, expected_wkts=None, expected_inventory=None):
+        """Shared transaction body for immediate cuts and reviewed-plan confirmation."""
+        results = []
+        for sheet_id, parts in cuts.items():
+            row = conn.execute("SELECT material, thickness_mm, polygon_wkt, dxf_path, source, location FROM remnants WHERE sheet_id=?", (sheet_id,)).fetchone()
+            if row is None:
+                raise ValueError("ERR_SHEET_NOT_FOUND: " + sheet_id)
+            if expected_wkts is not None and row[2] != expected_wkts[sheet_id]:
+                raise ValueError("ERR_STALE_WAREHOUSE: " + sheet_id)
+            if expected_inventory is not None and (row[0], row[1], row[4]) != expected_inventory[sheet_id]:
+                raise ValueError("ERR_STALE_WAREHOUSE_MATERIAL: " + sheet_id)
+            sheet = wkt.loads(row[2])
+            if any(p.is_empty or not p.is_valid or not sheet.buffer(0.002).covers(p) for p in parts):
+                raise ValueError("ERR_INVALID_CUT_FOOTPRINT")
+            updated = sheet.difference(unary_union([p.buffer(kerf_mm / 2) for p in parts]))
+            islands = sorted(updated.geoms, key=lambda g: g.area, reverse=True) if isinstance(updated, MultiPolygon) else [updated]
+            for i, poly in enumerate(islands):
+                sid = sheet_id if i == 0 else sheet_id + "_island_" + uuid.uuid4().hex[:12]
+                outer = float(Polygon(poly.exterior).area)
+                area = float(poly.area)
+                # An old DXF no longer describes the updated stock.
+                conn.execute("INSERT OR REPLACE INTO remnants (sheet_id, material, thickness_mm, outer_area_mm2, usable_area_mm2, hole_count, polygon_wkt, dxf_path, source, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                             (sid, row[0], row[1], outer, area, len(poly.interiors), poly.wkt, "", row[4], row[5]))
+                results.append(RemnantRecord(sid, row[0], row[1], outer, area, len(poly.interiors), poly, "", row[4], row[5]))
         return results
 
 

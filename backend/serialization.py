@@ -49,6 +49,7 @@ def serialize_remnant(rec: RemnantRecord) -> Dict[str, Any]:
         "material": rec.material,
         **material_identity(rec.material),
         "inventory_source": rec.source,
+        "location": rec.location,
         "thickness_mm": rec.thickness_mm,
         "outer_area_mm2": rec.outer_area_mm2,
         "usable_area_mm2": rec.usable_area_mm2,

@@ -7,12 +7,15 @@ shared explicitly so the UI contract stays independent of workflow internals.
 from __future__ import annotations
 
 import os
+import base64
+import hashlib
+import re
 import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from cv2 import error as cv2_error
+from cv2 import error as cv2_error, imencode
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +32,11 @@ from backend.photo_preflight import decode_station_image, photo_preflight
 from backend.schemas import (
     FullPipelineRequest, IndexImageRequest, NaturalLanguageOrderRequest,
     RequestModel, StationImageRequest, StructuredOrderRequest, UpsertRemnantRequest,
+    StockLocationRequest, ConfirmCutRequest,
+)
+from backend.review_workflow import (
+    accept_review, cached_review, confirm_plan, get_plan, get_review,
+    pending_reviews, reject_review, save_review,
 )
 from backend.serialization import (
     dict_to_polygon, polygon_to_dict, serialize_compiled_gcode,
@@ -212,9 +220,27 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
             "remnants": [serialize_remnant(r) for r in (r1, r2, r3)],
         }
 
-    @app.post("/api/v1/index-remnant")
-    def index_remnant_endpoint(req: IndexImageRequest) -> Dict[str, Any]:
+    def index_remnant(req: IndexImageRequest) -> Dict[str, Any]:
         try:
+            request_hash = hashlib.sha256(req.model_dump_json().encode()).hexdigest()
+            if req.review_id:
+                if req.save_to_warehouse:
+                    raise ValueError("ERR_REVIEW_REQUIRED: Reviewed scans must be accepted separately.")
+                previous = cached_review(db, req.review_id, request_hash)
+                if previous:
+                    return previous
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", req.sheet_id):
+                    raise ValueError("ERR_STOCK_ID: Use letters, numbers, dots, hyphens or underscores for the physical stock ID.")
+                if db.get_remnant(req.sheet_id):
+                    raise ValueError("ERR_STOCK_ID_EXISTS: This stock ID already exists. Inspect inventory before photographing the same sheet again.")
+                photo_hash = hashlib.sha256(base64.b64decode(req.image_base64.split(",")[-1], validate=True)).hexdigest()
+                with db._connect() as conn:
+                    duplicate = conn.execute("SELECT json_extract(payload,'$.review_fields.sheet_id') FROM intake_reviews WHERE accepted>=0 AND json_extract(payload,'$.photo_sha256')=?", (photo_hash,)).fetchone()
+                if duplicate:
+                    raise ValueError("ERR_DUPLICATE_CAPTURE: This exact photo already belongs to stock " + duplicate[0] + ". Recover its review or inspect inventory.")
+            if not req.material.strip():
+                raise ValueError("ERR_MISSING_MATERIAL: Specify the material grade and thickness from the stock label.")
+            material = normalize_material(req.material)
             img_bgr = decode_station_image(req.image_base64)
 
             cfg = StationCalibrationConfig(
@@ -245,9 +271,10 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
                     polygon=poly,
                     dxf_path=res.dxf_path,
                     source=res.vision_audit["segmentation"]["source"],
+                    location=req.location,
                 )
 
-            return {
+            result = {
                 "status": res.status,
                 "camera_angle_deg": res.camera_angle_deg,
                 "measured_marker_mm": res.measured_marker_mm,
@@ -261,10 +288,86 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
                 "timings_ms": res.timings_ms,
                 "saved_remnant": serialize_remnant(saved_rec) if saved_rec else None,
             }
+            if req.review_id:
+                # Same calibrated station frame, without another model request.
+                cal = indexer.calibrate_and_flatten(img_bgr)
+                ok, preview = imencode(".jpg", cal.warped_bgr)
+                if not ok:
+                    raise ValueError("ERR_PREVIEW_ENCODING")
+                result.update({
+                    "review_id": req.review_id,
+                    "photo_sha256": photo_hash,
+                    "inventory_source": res.vision_audit["segmentation"]["source"],
+                    "review_fields": {"sheet_id": req.sheet_id, "material": material,
+                                      "thickness_mm": req.thickness_mm, "location": req.location.strip()},
+                    "review_image_base64": "data:image/jpeg;base64," + base64.b64encode(preview).decode(),
+                    "review_frame": {"width_mm": req.table_width_mm, "height_mm": req.table_height_mm},
+                    "review_blocked": (poly.bounds[0] <= 1 or poly.bounds[1] <= 1
+                                       or poly.bounds[2] >= req.table_width_mm - 1
+                                       or poly.bounds[3] >= req.table_height_mm - 1),
+                })
+                return save_review(db, req.review_id, request_hash, result)
+            return result
         except ValueError as ve:
             raise HTTPException(status_code=422, detail=str(ve))
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    # A retry arriving during a reviewed scan waits for its durable result instead
+    # of starting a second paid inference. No background worker service is needed.
+    review_lock = threading.Lock()
+
+    @app.post("/api/v1/index-remnant")
+    def index_remnant_endpoint(req: IndexImageRequest):
+        with review_lock:
+            return index_remnant(req)
+
+    @app.get("/api/v1/intake-reviews")
+    def list_intake_reviews():
+        return {"reviews": pending_reviews(db)}
+
+    @app.get("/api/v1/intake-reviews/{review_id}")
+    def read_intake_review(review_id: str):
+        try:
+            return get_review(db, review_id)
+        except ValueError as exc:
+            raise HTTPException(404, str(exc))
+
+    @app.post("/api/v1/intake-reviews/{review_id}/accept")
+    def accept_intake_review(review_id: str):
+        try:
+            return accept_review(db, review_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @app.post("/api/v1/intake-reviews/{review_id}/reject")
+    def reject_intake_review(review_id: str):
+        try:
+            return reject_review(db, review_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @app.post("/api/v1/remnants/{sheet_id}/location")
+    def update_stock_location(sheet_id: str, req: StockLocationRequest):
+        with db._connect() as conn:
+            if not conn.execute("SELECT 1 FROM remnants WHERE sheet_id=?", (sheet_id,)).fetchone():
+                raise HTTPException(404, "ERR_SHEET_NOT_FOUND")
+            conn.execute("UPDATE remnants SET location=? WHERE sheet_id=?", (req.location.strip(), sheet_id))
+        return serialize_remnant(db.get_remnant(sheet_id))
+
+    @app.get("/api/v1/verified-plans/{plan_id}")
+    def read_verified_plan(plan_id: str):
+        result = get_plan(db, plan_id)
+        if result is None:
+            raise HTTPException(404, "ERR_PLAN_NOT_FOUND")
+        return result
+
+    @app.post("/api/v1/verified-plans/{plan_id}/confirm")
+    def confirm_verified_plan(plan_id: str, req: ConfirmCutRequest):
+        try:
+            return confirm_plan(db, plan_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
 
     @app.post("/api/v1/parse-order")
     def parse_natural_language_order(req: NaturalLanguageOrderRequest) -> Dict[str, Any]:
@@ -303,11 +406,14 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    plan_lock = threading.Lock()
+
     @app.post("/api/v1/execute-pipeline")
     def execute_full_manufacturing_pipeline(req: FullPipelineRequest) -> Dict[str, Any]:
         """Preview a complete batch, or atomically commit it after verification."""
         try:
-            return execute_pipeline(req, db, llm, upload_root)
+            with plan_lock:
+                return execute_pipeline(req, db, llm, upload_root)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         except Exception as exc:

@@ -41,3 +41,16 @@ Results are added after each milestone passes its checks.
 - Dependencies were checked at installation; patched Vitest 4 replaced an older
   test runner flagged by npm audit. The resolved installation reports zero known
   vulnerabilities. Dependency versions are recorded in `package-lock.json`.
+
+### Milestone 2
+
+- Added one read-only photo-preflight route using the existing ArUco/calibration
+  implementation, with marker coordinates, actionable issues and rectified frame.
+- Seven API tests pass: all four missing-marker cases still fail real indexing;
+  valid preflight writes no database/files and calls no segmentation; bad station
+  dimensions fail; managed DXF downloads cannot expose non-DXF files.
+- Scanner tests exercise automatic checks, changed-profile invalidation and
+  retained input after segmentation failure. Inventory can inspect actual stock
+  and explicitly seed demo stock after a reset explanation.
+- No provider calls, private-photo publication or production-inventory changes
+  are needed to verify this milestone.

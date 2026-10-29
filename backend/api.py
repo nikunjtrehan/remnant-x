@@ -6,16 +6,15 @@ shared explicitly so the UI contract stays independent of workflow internals.
 
 from __future__ import annotations
 
-import base64
 import os
 import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import cv2
-import numpy as np
+from cv2 import error as cv2_error
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from shapely.geometry import Polygon
 
@@ -25,10 +24,11 @@ from backend.materials import normalize_material
 from backend.m1_sam_indexer import RemnantOpticalIndexer, StationCalibrationConfig
 from backend.m2_spark_orchestrator import SparkWarehouseOrchestrator
 from backend.pipeline import checked_uploads, check_order_uploads, execute_pipeline
+from backend.photo_preflight import decode_station_image, photo_preflight
 # Request types and serializers remain importable here for earlier Python callers.
 from backend.schemas import (
     FullPipelineRequest, IndexImageRequest, NaturalLanguageOrderRequest,
-    RequestModel, StructuredOrderRequest, UpsertRemnantRequest,
+    RequestModel, StationImageRequest, StructuredOrderRequest, UpsertRemnantRequest,
 )
 from backend.serialization import (
     dict_to_polygon, polygon_to_dict, serialize_compiled_gcode,
@@ -90,6 +90,22 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
     llm = LiveModelClient()
     app.state.db = db
     app.state.llm = llm
+
+    @app.post("/api/v1/photo-preflight")
+    def check_station_photo(req: StationImageRequest) -> Dict[str, Any]:
+        """Check markers and calibration without SAM, files or warehouse writes."""
+        try:
+            return photo_preflight(req, llm)
+        except (ValueError, cv2_error) as exc:
+            raise HTTPException(422, str(exc))
+
+    @app.get("/api/v1/artifacts/{filename}")
+    def download_indexed_dxf(filename: str):
+        target = (artifact_root / filename).resolve()
+        if (target.parent != artifact_root or target.suffix.lower() != ".dxf"
+                or not target.is_file()):
+            raise HTTPException(404, "ERR_ARTIFACT_NOT_FOUND")
+        return FileResponse(target, media_type="application/dxf", filename=target.name)
 
     @app.get("/api/v1/health")
     def health_check() -> Dict[str, Any]:
@@ -199,12 +215,7 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
     @app.post("/api/v1/index-remnant")
     def index_remnant_endpoint(req: IndexImageRequest) -> Dict[str, Any]:
         try:
-            b64_clean = req.image_base64.split(",")[-1]
-            img_bytes = base64.b64decode(b64_clean, validate=True)
-            arr = np.frombuffer(img_bytes, dtype=np.uint8)
-            img_bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if img_bgr is None:
-                raise ValueError("ERR_DECODE_IMAGE: Could not decode base64 image.")
+            img_bgr = decode_station_image(req.image_base64)
 
             cfg = StationCalibrationConfig(
                 table_width_mm=req.table_width_mm,

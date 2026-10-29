@@ -13,14 +13,16 @@ class UpsertRemnantRequest(RequestModel):
     holes: List[List[List[float]]] = Field(default_factory=list)
     dxf_path: str = ""
 
-class IndexImageRequest(RequestModel):
-    sheet_id: str = "REM_CAM_01"
-    material: str = Field(min_length=1)
-    thickness_mm: float = Field(ge=0.1, le=50)
+class StationImageRequest(RequestModel):
     image_base64: str = Field(max_length=30_000_000)
     table_width_mm: float = Field(default=600.0, gt=0, le=2000)
     table_height_mm: float = Field(default=450.0, gt=0, le=2000)
     marker_size_mm: float = Field(default=50.0, gt=0)
+
+class IndexImageRequest(StationImageRequest):
+    sheet_id: str = Field(default="REM_CAM_01", min_length=1, max_length=120)
+    material: str = Field(min_length=1)
+    thickness_mm: float = Field(ge=0.1, le=50)
     use_live_vision_audit: bool = False
     save_to_warehouse: bool = True
     segmentation_mode: Literal["sam", "local_threshold"] = "sam"

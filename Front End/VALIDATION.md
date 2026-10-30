@@ -53,7 +53,8 @@ The unmodified contours produced a real Baseten-parsed 50-copy DXF job and a
 complete nine-part job across both sheets, with final software verification.
 These were isolated API checks, not a second browser exercise. Physical source
 photos remain private. Corrected references were supplied after results; exterior
-errors reach 7.32 mm and one supplied offset remains inconsistent.
+errors reach 7.32 mm. The user corrected the remaining gap reference to 80 mm;
+the detected gaps are 80.54 and 81.36 mm.
 
 The live captures also prompted clearer recapture guidance for calibration
 failure and disconnected contours, including a single sheet cropped by the

@@ -93,6 +93,7 @@ All values are millimetres. The notch is exterior geometry, not a third hole.
 | Circle vertical span | 80 | 80.5 | 80.7 |
 | Circle equivalent-area diameter | 80 | 80.9 | 80.5 |
 | Circle right gap | 20 | 20.1 | 20.4 |
+| Rectangle bottom to circle top, vertical gap | 80 | 80.5 | 81.4 |
 
 B's largest scored internal-feature/notch error is 3.04 mm. Exterior height error
 reaches 5.27 mm. Idealized revised usable area is 36,353.45 mm²; extracted areas
@@ -101,27 +102,23 @@ local boundary errors.
 
 ![Unmodified extracted contour rotated into measurement axes](assets/piece-b-contour-20261030.png)
 
-### The 125 mm reference conflicts with the other dimensions
+### Corrected rectangle-to-circle gap
 
-The user describes 125 mm from the rectangle's bottom-left to the circular hole's
-first intersection, specifically its very top edge, using “diagonal/vertical.”
-Under a vertical top-edge interpretation:
+The user corrected the previously supplied 125 mm measurement to **80 mm**
+(8 cm). The earlier reference and comparison are retained privately as revision
+history; there is no remaining reference-closure conflict.
 
-`26 + 46 + 125 + 80 = 277 mm`, exceeding the 250 mm exterior height.
+Observed rectangle-bottom to circle-top vertical gaps are **80.54 / 81.36 mm**,
+errors of **+0.54 / +1.36 mm** against the corrected reference. Distances between
+the rectangle bounds' bottom-left and detected circle's topmost point are
+**80.78 / 81.39 mm**, errors of **+0.78 / +1.39 mm** if measured directly between
+those endpoints. The diagram distinguishes vertical separation from direct
+distance. Both interpretations agree closely with the corrected 80 mm reference.
 
-Even as a diagonal to the topmost point, the other references place the rectangle
-corner at x=127 mm and circle centre at x=120 mm. A circle fitting inside this
-sheet allows a maximum distance of about 98.25 mm to its topmost point.
-
-Observed rectangle-bottom to circle-top vertical gaps are **80.54 / 81.36 mm**
-(literal differences from 125: **−44.46 / −43.64 mm**). Distances between the
-rectangle bounds' bottom-left and detected circle's topmost point are
-**80.78 / 81.39 mm**. The diagram marks those endpoints. Contour irregularities
-affect definitions slightly, but do not resolve this roughly 44 mm discrepancy.
-
-The 125 mm reference is retained as conflicting and excluded from accuracy
-acceptance. It is not silently reinterpreted as a centre measurement. Another
-physical endpoint check is needed before treating it as valid ground truth.
+The corrected vertical reference stack is `26 + 46 + 80 + 80 = 232 mm`, leaving
+18 mm below the circle within the 250 mm exterior. Saved model results and
+contours were unchanged; only the comparison reference and report were updated.
+This correction also followed the estimates and is not blind validation.
 
 ## Piece A repeat captures
 
@@ -174,8 +171,8 @@ shapes, rotation, perspective, blocked captures, physical-stock identity and
 complete verified multi-sheet planning. No model integration or geometry code
 change was needed for these specimens.
 
-This remains a supervised cardboard prototype. The 125 mm endpoint needs checking,
-exterior accuracy varies with capture, metal/glare performance remains untested,
+This remains a supervised cardboard prototype. The reference discrepancy is
+resolved; exterior accuracy varies with capture, metal/glare performance remains untested,
 and a fresh operator walkthrough is separate work. Demo claims should retain
 these measured errors and limits.
 

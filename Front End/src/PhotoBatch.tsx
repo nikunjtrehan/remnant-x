@@ -15,7 +15,9 @@ import { collectPhotos, readFile } from "./photo-import";
 import type { SourcePhoto } from "./photo-import";
 import { Busy, ErrorNotice, Field, loadLocal } from "./ui";
 import { defaultStation, validStation } from "./station";
-import { loadIntake, saveIntake } from "./recovery";
+import { loadIntake, saveIntake, listIntakeHistory } from "./recovery";
+import type { IntakeHistory } from "./recovery";
+import { errorGuidance } from "./errors";
 import type { IndexResult, Preflight, ScanFields, Station } from "./types";
 
 type Status =
@@ -92,6 +94,18 @@ export function PhotoBatch({
   onStationProfileChange?: (station: Station) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
+  const [batchId, setBatchId] = useState(() =>
+    loadLocal(
+      "remnantx.active-batch.v1",
+      "batch",
+      (v): v is string =>
+        typeof v === "string" && (v === "batch" || v.startsWith("batch:")),
+    ),
+  );
+  const [storageBlocked, setStorageBlocked] = useState(false);
+  const [batchName, setBatchName] = useState("Batch 1");
+  const [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
+  const [history, setHistory] = useState<IntakeHistory[]>([]);
   const [items, setItems] = useState<Item[]>([]),
     [selectedId, setSelectedId] = useState("");
   const [station, setStation] = useState(
@@ -130,12 +144,22 @@ export function PhotoBatch({
       setItems((old) =>
         old.map((i) =>
           i.id === selected?.id &&
-          !["added", "indexing", "review", "error"].includes(i.status)
+          !["added", "indexing", "review"].includes(i.status)
             ? {
                 ...i,
                 check,
-                status: check.ready ? "ready" : "blocked",
-                error: "",
+                status: check.ready
+                  ? i.status === "error"
+                    ? "error"
+                    : "ready"
+                  : "blocked",
+                error: check.ready
+                  ? i.status === "error"
+                    ? i.error
+                    : ""
+                  : check.issues
+                      .map((issue) => issue.code + ": " + issue.message)
+                      .join(" "),
               }
             : i,
         ),
@@ -175,15 +199,24 @@ export function PhotoBatch({
   useEffect(() => {
     if (!globalThis.indexedDB) return;
     let mounted = true;
-    void loadIntake("batch")
+    void loadIntake(batchId)
       .then(async (saved) => {
-        if (!saved || !mounted) return;
+        if (!mounted) return;
+        if (!saved) {
+          setItems([]);
+          setSelectedId("");
+          return;
+        }
+        setStorageBlocked(false);
+        setIssues(saved.issues || []);
+        setBatchName(saved.name || "Batch 1");
+        setCreatedAt(saved.createdAt || new Date().toISOString());
         const rows = await Promise.all(
           saved.items.map(async (item) => {
             const row = {
               ...item,
               label: item.label ?? item.file.name,
-              status: "unchecked",
+              status: item.status === "blocked" ? "blocked" : "unchecked",
             } as Item;
             if (
               ["indexing", "error", "review", "added"].includes(item.status) &&
@@ -195,6 +228,7 @@ export function PhotoBatch({
               } catch {
                 row.status = "error";
                 row.error =
+                  item.error ||
                   "The saved analysis has not been recovered. Use Recover analyses before retrying.";
               }
             }
@@ -208,7 +242,12 @@ export function PhotoBatch({
         }
       })
       .catch((e) => {
-        if (mounted) setRecoveryNote((e as Error).message);
+        if (mounted) {
+          setStorageBlocked(true);
+          setItems([]);
+          setSelectedId("");
+          setRecoveryNote((e as Error).message);
+        }
       })
       .finally(() => {
         if (mounted) setRestored(true);
@@ -216,19 +255,72 @@ export function PhotoBatch({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [batchId]);
   useEffect(() => {
-    if (!restored || !globalThis.indexedDB) return;
-    void saveIntake("batch", { items, station, defaults, selectedId })
-      .then(() =>
+    if (
+      !restored ||
+      !globalThis.indexedDB ||
+      storageBlocked ||
+      busy === "Opening photos and ZIP archives"
+    )
+      return;
+    void saveIntake(batchId, {
+      items,
+      station,
+      defaults,
+      selectedId,
+      name: batchName,
+      issues,
+      createdAt,
+    })
+      .then(async () => {
+        setHistory(await listIntakeHistory());
         setRecoveryNote(
           items.length
-            ? "Queue saved on this browser · analysis does not restart on reload."
+            ? "Batch saved on this browser. Reopen it from Batch history."
             : "",
-        ),
-      )
+        );
+      })
       .catch((e) => setRecoveryNote((e as Error).message));
-  }, [items, station, defaults, selectedId, restored]);
+  }, [
+    items,
+    station,
+    defaults,
+    selectedId,
+    restored,
+    batchId,
+    batchName,
+    createdAt,
+    issues,
+    storageBlocked,
+    busy,
+  ]);
+  const openBatch = async (id: string) => {
+    if (active.current || busy || !restored) return;
+    try {
+      if (!storageBlocked)
+        await saveIntake(batchId, {
+          items,
+          station,
+          defaults,
+          selectedId,
+          name: batchName,
+          issues,
+          createdAt,
+        });
+      const next = id || "batch:" + crypto.randomUUID();
+      localStorage.setItem("remnantx.active-batch.v1", JSON.stringify(next));
+      setStorageBlocked(false);
+      setRestored(false);
+      setIssues([]);
+      setError("");
+      setBatchName("Batch " + (history.length + 1));
+      setCreatedAt(new Date().toISOString());
+      setBatchId(next);
+    } catch (e) {
+      setRecoveryNote((e as Error).message);
+    }
+  };
   const recover = async () => {
     if (active.current) return;
     active.current = true;
@@ -260,9 +352,13 @@ export function PhotoBatch({
     setError("");
     try {
       const replacing = items.find((i) => i.id === replaceId.current);
+      const newZipBatch =
+        !replacing &&
+        items.length > 0 &&
+        files.some((file) => /\.zip$/i.test(file.name));
       const imported = await collectPhotos(
         files,
-        items.filter((i) => i.id !== replacing?.id),
+        newZipBatch ? [] : items.filter((i) => i.id !== replacing?.id),
       );
       setIssues(imported.issues);
       if (replacing) {
@@ -293,7 +389,10 @@ export function PhotoBatch({
               sheet_id: `REM_${id.replaceAll("-", "").slice(0, 16).toUpperCase()}`,
               material: defaults.material,
               thickness_mm: defaults.thickness,
-              segmentation_concept: "sheet",
+              segmentation_concept:
+                defaults.material.trim().toLowerCase() === "cardboard"
+                  ? "cardboard sheet"
+                  : "sheet",
               use_clahe: false,
               review_id: crypto.randomUUID(),
               location: "",
@@ -302,8 +401,38 @@ export function PhotoBatch({
             revision: 0,
           };
         });
-        setItems((old) => [...old, ...rows]);
-        if (!selectedId && rows.length) setSelectedId(rows[0].id);
+        const zipName = files.find((file) => /\.zip$/i.test(file.name))?.name;
+        if (newZipBatch && rows.length) {
+          await saveIntake(batchId, {
+            items,
+            station,
+            defaults,
+            selectedId,
+            name: batchName,
+            issues,
+            createdAt,
+          });
+          const next = "batch:" + crypto.randomUUID();
+          await saveIntake(next, {
+            items: rows,
+            station,
+            defaults,
+            selectedId: rows[0].id,
+            name: zipName || "Batch " + (history.length + 1),
+            issues: imported.issues,
+            createdAt: new Date().toISOString(),
+          });
+          localStorage.setItem(
+            "remnantx.active-batch.v1",
+            JSON.stringify(next),
+          );
+          setRestored(false);
+          setBatchId(next);
+        } else {
+          if (!items.length && zipName) setBatchName(zipName);
+          setItems((old) => [...old, ...rows]);
+          if (!selectedId && rows.length) setSelectedId(rows[0].id);
+        }
       }
     } catch (e) {
       setError((e as Error).message);
@@ -335,7 +464,15 @@ export function PhotoBatch({
             await readFile(item.file, "url"),
             station,
           );
-          patch(item.id, { check, status: check.ready ? "ready" : "blocked" });
+          patch(item.id, {
+            check,
+            status: check.ready ? "ready" : "blocked",
+            error: check.ready
+              ? ""
+              : check.issues
+                  .map((issue) => issue.code + ": " + issue.message)
+                  .join(" "),
+          });
         } catch (e) {
           patch(item.id, { status: "blocked", error: (e as Error).message });
         }
@@ -349,7 +486,12 @@ export function PhotoBatch({
   const analyze = async (ids?: string[]) => {
     if (active.current) return;
     const ready = items.filter(
-      (i) => i.status === "ready" && (!ids || ids.includes(i.id)),
+      (i) =>
+        (!ids || ids.includes(i.id)) &&
+        (i.status === "ready" ||
+          // A deliberate single-photo retry may follow a failed SAM request.
+          // Bulk analysis must not silently repeat failed paid requests.
+          (!!ids && i.status === "error" && i.check?.ready && !i.result)),
     );
     const idsInQueue = items.map((i) => i.fields.sheet_id.trim());
     if (new Set(idsInQueue).size !== idsInQueue.length) {
@@ -435,6 +577,42 @@ export function PhotoBatch({
   return (
     <>
       <section className="panel batch-panel">
+        <div className="batch-history">
+          <Field label="Batch history (this browser)">
+            <select
+              value={batchId}
+              disabled={!!busy || !restored}
+              onChange={(e) => void openBatch(e.target.value)}
+            >
+              {!history.some((b) => b.id === batchId) && (
+                <option value={batchId}>{batchName} · new</option>
+              )}
+              {history.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} · {b.count} photos · {b.accepted} accepted
+                  {b.createdAt
+                    ? " · " + new Date(b.createdAt).toLocaleString()
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button
+            className="button secondary"
+            disabled={!!busy || !restored}
+            onClick={() => void openBatch("")}
+          >
+            New batch
+          </button>
+          <Field label="Batch name">
+            <input
+              value={batchName}
+              maxLength={100}
+              disabled={!!busy || !restored}
+              onChange={(e) => setBatchName(e.target.value)}
+            />
+          </Field>
+        </div>
         {!restored && <Busy label="Restoring the local photo queue" />}
         {recoveryNote && (
           <p className="hint" role="status">
@@ -446,10 +624,10 @@ export function PhotoBatch({
             <span className="eyebrow">
               REMNANT INTAKE · MULTIPLE PHOTOS OR ZIP
             </span>
-            <h2>A whole stack. One clear queue.</h2>
+            <h2>1. Upload and inspect your photos.</h2>
             <p>
-              One station photo per distinct remnant. Check every photo before
-              sending it to SAM.
+              One photo per physical piece. Select a thumbnail to inspect it
+              before sending it to SAM.
             </p>
           </div>
           <span className="badge neutral">{items.length} / 50 photos</span>
@@ -484,7 +662,7 @@ export function PhotoBatch({
             <UploadCloud size={24} />
             <span>
               <strong>Add photos or a ZIP</strong>
-              <small>JPEG / PNG · 20 MB each · 100 MB per queue</small>
+              <small>JPEG / PNG · 20 MB each · 100 MB per batch</small>
             </span>
             <Archive size={19} />
           </button>
@@ -502,6 +680,12 @@ export function PhotoBatch({
                           ...i.fields,
                           material: defaults.material,
                           thickness_mm: defaults.thickness,
+                          segmentation_concept:
+                            i.fields.segmentation_concept === "sheet" &&
+                            defaults.material.trim().toLowerCase() ===
+                              "cardboard"
+                              ? "cardboard sheet"
+                              : i.fields.segmentation_concept,
                         },
                         revision: i.revision + 1,
                       },
@@ -544,7 +728,7 @@ export function PhotoBatch({
                 !items.some((i) => !["added", "review"].includes(i.status))
               }
             >
-              Apply to pending photos
+              Apply material to all unprocessed photos
             </button>
           </form>
         </div>
@@ -560,22 +744,32 @@ export function PhotoBatch({
         )}
         {!!items.length && (
           <>
+            <p className="hint">
+              <strong>2. Set the material above, then check the photos.</strong>{" "}
+              Check markers verifies the four ArUco corners and scale without
+              using AI credits. Find outlines &amp; holes sends only ready
+              photos to SAM; inspect and approve each result before it becomes
+              stock.
+            </p>
             <div className="batch-actions">
-              <button
-                type="button"
-                className="button secondary"
-                disabled={!!busy}
-                onClick={() => void recover()}
-              >
-                Recover analyses
-              </button>
+              <details className="batch-recovery">
+                <summary>Recover saved work</summary>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={!!busy}
+                  onClick={() => void recover()}
+                >
+                  Recover analyses
+                </button>
+              </details>
               <button
                 className="button secondary"
                 disabled={!!busy || items.every((i) => i.status === "added")}
                 onClick={() => void checkAll()}
               >
                 <ScanLine size={15} />
-                Check pending photos
+                Check markers in photos
               </button>
               <button
                 className="button primary"
@@ -583,7 +777,7 @@ export function PhotoBatch({
                 onClick={() => void analyze()}
               >
                 <CheckCircle2 size={15} />
-                Analyze {counts.ready} ready photo
+                Find outlines & holes in {counts.ready} photo
                 {counts.ready === 1 ? "" : "s"}
               </button>
               {busy && (
@@ -654,6 +848,18 @@ export function PhotoBatch({
                       </span>
                     </span>
                   </button>
+                  {(item.error || (item.check && !item.check.ready)) && (
+                    <div className="batch-photo-issue" role="status">
+                      {item.error
+                        ? errorGuidance(item.error).title
+                        : item.check?.issues
+                            .map((issue) => issue.message)
+                            .join(" ")}
+                      {item.error && (
+                        <small>{errorGuidance(item.error).body}</small>
+                      )}
+                    </div>
+                  )}
                   <div className="batch-row-actions">
                     {!["added", "review"].includes(item.status) && (
                       <button
@@ -695,11 +901,6 @@ export function PhotoBatch({
         )}
         {busy && <Busy label={busy} />}
         <ErrorNotice message={error} />
-        {selected?.error && (
-          <ErrorNotice
-            message={`${selected.file.name}: ${selected.error}${selected.status === "error" ? " Refresh inventory before retrying; a failed response does not confirm that stock was unchanged." : ""}`}
-          />
-        )}
       </section>
       {selected && (
         <Capture

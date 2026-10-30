@@ -51,6 +51,7 @@ class StructuredOrderRequest(RequestModel):
     parts: List[Dict[str, Any]]
 
 class FullPipelineRequest(RequestModel):
+    selected_sheet_ids: Optional[List[str]] = Field(default=None, min_length=1, max_length=10000)
     prompt: Optional[str] = None
     order: Optional[Dict[str, Any]] = None
     coarse_step_mm: float = Field(default=8.0, ge=0.1, le=1000)

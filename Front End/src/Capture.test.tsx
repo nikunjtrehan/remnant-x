@@ -44,7 +44,7 @@ describe("capture gate", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: /Analyze for geometry review/,
+          name: /Find outline & holes/,
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -68,7 +68,7 @@ describe("capture gate", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: /Analyze for geometry review/,
+          name: /Find outline & holes/,
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -92,7 +92,7 @@ describe("capture gate", () => {
       "cardboard",
     );
     await userEvent.click(
-      screen.getByRole("button", { name: /Analyze for geometry review/ }),
+      screen.getByRole("button", { name: /Find outline & holes/ }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("alert")).toHaveProperty(

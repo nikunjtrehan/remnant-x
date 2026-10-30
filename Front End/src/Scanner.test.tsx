@@ -67,7 +67,7 @@ it("keeps batch station setup open while invalidating and rechecking changed dim
   expect((bottom as HTMLInputElement).value).toBe("480");
   expect(api.preflight).toHaveBeenCalledTimes(1);
   await userEvent.click(
-    screen.getByRole("button", { name: "Check pending photos" }),
+    screen.getByRole("button", { name: "Check markers in photos" }),
   );
   await waitFor(() =>
     expect(api.preflight).toHaveBeenLastCalledWith(

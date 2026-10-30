@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { File as NodeFile } from "node:buffer";
-import { loadIntake, saveIntake } from "./recovery";
+import { loadIntake, saveIntake, listIntakeHistory } from "./recovery";
 import { defaultStation } from "./station";
 import type { RecoveryPhoto } from "./recovery";
 beforeEach(() => {
@@ -33,7 +33,7 @@ it("restores actual photo bytes and the same analysis ID across metadata checkpo
     selectedId: item.id,
   });
   await saveIntake("batch", {
-    items: [{ ...item, status: "review" }],
+    items: [{ ...item, status: "review", error: "Saved rejection reason" }],
     station: defaultStation,
   });
   const restored = await loadIntake("batch");
@@ -41,6 +41,7 @@ it("restores actual photo bytes and the same analysis ID across metadata checkpo
   expect(await restored?.items[0].file.text()).toBe("original bytes");
   expect(restored?.items[0].fields.review_id).toBe("stable-review");
   expect(restored?.items[0].status).toBe("review");
+  expect(restored?.items[0].error).toBe("Saved rejection reason");
 });
 it("clears one intake without deleting the other intake's photos", async () => {
   await saveIntake("single", {
@@ -54,4 +55,28 @@ it("clears one intake without deleting the other intake's photos", async () => {
   await saveIntake("batch", { items: [], station: defaultStation });
   expect((await loadIntake("batch"))?.items).toHaveLength(0);
   expect((await loadIntake("single"))?.items[0].file.name).toBe("single.png");
+});
+
+it("keeps named batches independent, including the legacy queue namespace", async () => {
+  await saveIntake("batch", {
+    name: "Original ZIP",
+    items: [photo("old.png")],
+    station: defaultStation,
+  });
+  await saveIntake("batch:second", {
+    name: "Second ZIP",
+    items: [photo("new.png")],
+    station: defaultStation,
+  });
+  await saveIntake("batch", {
+    name: "Original ZIP",
+    items: [],
+    station: defaultStation,
+  });
+  expect(await (await loadIntake("batch:second"))?.items[0].file.text()).toBe(
+    "original bytes",
+  );
+  const history = await listIntakeHistory();
+  expect(history.map((b) => b.name)).toEqual(["Second ZIP"]);
+  expect(history[0].sheetIds).toEqual(["RX-001"]);
 });

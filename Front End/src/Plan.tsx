@@ -13,7 +13,8 @@ import { CuttingPlan } from "./CuttingPlan";
 import { OrderEditor } from "./OrderEditor";
 import { Busy, ErrorNotice, Field, Modal } from "./ui";
 import { formatNumber, geometryPath, partDescription } from "./geometry";
-import { loadOrderDraft, saveOrderDraft } from "./recovery";
+import { loadOrderDraft, saveOrderDraft, listIntakeHistory } from "./recovery";
+import type { IntakeHistory } from "./recovery";
 import type {
   Order,
   PipelineResult,
@@ -47,6 +48,23 @@ export function Plan({
   example,
   onLive,
 }: Props) {
+  const [batches, setBatches] = useState<IntakeHistory[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    void listIntakeHistory()
+      .then((rows) => {
+        if (mounted) setBatches(rows);
+      })
+      .catch(() => {
+        if (mounted)
+          setRecoveryNote(
+            "Batch history could not be read. Use current inventory or reopen the scanner.",
+          );
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [inventory]);
   const [inputMode, setInputMode] = useState<"prompt" | "parts">("prompt");
   const [prompt, setPrompt] = useState("");
   const [order, setOrder] = useState<Order | null>(null),
@@ -153,6 +171,10 @@ export function Plan({
   };
   const run = async (commit = false) => {
     if (!order || busy || example) return;
+    if (!commit && settings.selected_sheet_ids?.length === 0) {
+      setError("Select at least one batch or use all compatible inventory.");
+      return;
+    }
     setError("");
     setBusy(
       commit
@@ -274,6 +296,8 @@ export function Plan({
   const compatible = shownOrder
     ? inventory.filter(
         (s) =>
+          (!settings.selected_sheet_ids ||
+            settings.selected_sheet_ids.includes(s.sheet_id)) &&
           s.material === shownOrder.material &&
           Math.abs(s.thickness_mm - shownOrder.thickness_mm) <= 0.01 &&
           (settings.allow_demo_stock ||
@@ -298,6 +322,69 @@ export function Plan({
               </p>
             </div>
           </div>
+          {!example && (
+            <fieldset className="batch-stock-selection" disabled={!!busy}>
+              <legend>Choose material for this job</legend>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.selected_sheet_ids === undefined}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      selected_sheet_ids: e.target.checked ? undefined : [],
+                    });
+                    invalidate();
+                  }}
+                />
+                Use all compatible inventory
+              </label>
+              {batches.map((batch) => {
+                const ids = batch.sheetIds.filter((id) =>
+                  inventory.some((s) => s.sheet_id === id),
+                );
+                const chosen = settings.selected_sheet_ids;
+                return (
+                  <label key={batch.id} className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      disabled={!ids.length}
+                      checked={
+                        !!chosen &&
+                        ids.length > 0 &&
+                        ids.every((id) => chosen.includes(id))
+                      }
+                      onChange={(e) => {
+                        const next = new Set(chosen || []);
+                        ids.forEach((id) =>
+                          e.target.checked ? next.add(id) : next.delete(id),
+                        );
+                        setSettings({
+                          ...settings,
+                          selected_sheet_ids: [...next],
+                        });
+                        invalidate();
+                      }}
+                    />
+                    {batch.name} · {ids.length} available / {batch.count} photos
+                  </label>
+                );
+              })}
+              {settings.selected_sheet_ids?.length === 0 && (
+                <p role="status">Select at least one batch before planning.</p>
+              )}
+              {settings.selected_sheet_ids && !batches.length && (
+                <p className="hint">
+                  Saved selection: {settings.selected_sheet_ids.join(", ")}
+                </p>
+              )}
+              <p className="hint">
+                Only accepted, currently available sheets from your selection
+                can be used. Material and thickness still have to match. Batch
+                names are saved in this browser.
+              </p>
+            </fieldset>
+          )}
           {example && sample ? (
             <>
               <div className="example-note">

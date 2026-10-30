@@ -6,6 +6,11 @@ import { batchIsComplete } from "./verification";
 import { api } from "./api";
 import { StrictMode } from "react";
 import type { Geometry, Order, PipelineResult } from "./types";
+import { listIntakeHistory } from "./recovery";
+vi.mock("./recovery", async (original) => ({
+  ...(await original<typeof import("./recovery")>()),
+  listIntakeHistory: vi.fn(),
+}));
 vi.mock("./api", () => ({
   api: {
     parse: vi.fn(),
@@ -121,6 +126,7 @@ const props = {
 };
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(listIntakeHistory).mockResolvedValue([]);
   localStorage.clear();
 });
 async function parseOrder() {
@@ -407,4 +413,46 @@ describe("whole-batch completion", () => {
       }),
     ).toBe(false);
   });
+});
+
+it("sends only selected batch sheet IDs and blocks an empty stock selection", async () => {
+  vi.mocked(listIntakeHistory).mockResolvedValue([
+    {
+      id: "batch:a",
+      name: "Morning ZIP",
+      count: 1,
+      accepted: 1,
+      sheetIds: ["S1"],
+    },
+    {
+      id: "batch:b",
+      name: "Afternoon ZIP",
+      count: 1,
+      accepted: 1,
+      sheetIds: ["S2"],
+    },
+  ]);
+  vi.mocked(api.parse).mockResolvedValue({ order, llm_trace: {} });
+  vi.mocked(api.execute).mockResolvedValue(result);
+  render(
+    <Plan
+      {...props}
+      inventory={[
+        ...result.candidate_sheets,
+        { ...result.candidate_sheets[0], sheet_id: "S2" },
+      ]}
+    />,
+  );
+  await screen.findByRole("checkbox", { name: /Morning ZIP/ });
+  await userEvent.click(screen.getByRole("checkbox", { name: /Morning ZIP/ }));
+  await parseOrder();
+  await screen.findByRole("button", { name: /Nest & verify/ });
+  await userEvent.click(screen.getByRole("button", { name: /Nest & verify/ }));
+  await waitFor(() => expect(api.execute).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(api.execute).mock.calls[0][1].selected_sheet_ids).toEqual([
+    "S1",
+  ]);
+  await userEvent.click(screen.getByRole("checkbox", { name: /Morning ZIP/ }));
+  await userEvent.click(screen.getByRole("button", { name: /Nest & verify/ }));
+  expect(api.execute).toHaveBeenCalledTimes(1);
 });

@@ -1,5 +1,21 @@
 # Desktop workbench milestones
 
+### Intake history and stock selection follow-up · 31 October 2026
+
+- Added named, independently reopenable browser batches, automatic new groups
+  for subsequent ZIP uploads, original-file recovery and saved import notices.
+- Added multi-batch stock selection to planning, enforced by a backend candidate
+  filter before nesting. Stored plan identity includes the selection.
+- Replaced ambiguous intake labels with explicit material, marker-check and
+  outline-extraction actions. Failed photos show their own guidance.
+- Fixed the enabled single-photo retry doing nothing after a SAM failure.
+- The history is browser-local; server reviews, inventory and plans remain
+  authoritative. Existing upload-size and duplicate guards remain enforced.
+- Validation: 185 backend tests, 47 frontend tests, TypeScript and production
+  build passed. Browser checks imported ZIPs, retained separate history entries,
+  reopened the first ZIP after refresh and checked both photos' markers without
+  paid inference.
+
 The frontend lives here; FastAPI remains the only backend. Milestone commits
 are review checkpoints, preserved in the published GitHub history.
 

@@ -397,3 +397,50 @@
   line-height: 1.6;
   border-bottom: 1px solid #dde3d8;
 }
+
+.batch-history {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.batch-history > :first-child {
+  flex: 2 1 22rem;
+}
+.batch-history > :last-child {
+  flex: 1 1 12rem;
+}
+.batch-history select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem;
+  background: white;
+  border: 1px solid #ccd6c5;
+  border-radius: 8px;
+  color: inherit;
+}
+.batch-row {
+  flex-wrap: wrap;
+}
+.batch-photo-issue {
+  order: 3;
+  flex-basis: 100%;
+  padding: 0.5rem 0.75rem;
+  color: #9c421e;
+  background: #fff5ed;
+  border-radius: 6px;
+}
+.batch-photo-issue small {
+  display: block;
+  margin-top: 0.3rem;
+}
+.batch-stock-selection {
+  border: 1px solid #dbe2d5;
+  border-radius: 10px;
+  padding: 1rem;
+  margin: 0 0 1.25rem;
+}
+.batch-stock-selection .checkbox-label {
+  margin: 0.6rem 0;
+}

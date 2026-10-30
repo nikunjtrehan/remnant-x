@@ -60,6 +60,9 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
     timings["parse_ms"] = round((time.perf_counter() - started) * 1000, 2)
     stage = time.perf_counter()
     plan = orch.orchestrate_order_plan(order_spec)
+    if req.selected_sheet_ids is not None:
+        allowed = set(req.selected_sheet_ids)
+        plan.candidate_sheets = [r for r in plan.candidate_sheets if r.sheet_id in allowed]
     if not req.allow_demo_stock:
         plan.candidate_sheets = [r for r in plan.candidate_sheets if r.source not in {"demo", "local_threshold"} and not r.sheet_id.startswith("DEMO_")]
     timings["warehouse_query_ms"] = round((time.perf_counter() - stage) * 1000, 2)

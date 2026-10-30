@@ -1,6 +1,7 @@
 /** Local-only file recovery. Server reviews/plans remain authoritative for writes. */
 import type { ScanFields, Station } from "./types";
 export interface RecoveryPhoto {
+  error?: string;
   id: string;
   hash: string;
   label?: string;
@@ -10,6 +11,9 @@ export interface RecoveryPhoto {
   revision: number;
 }
 export interface IntakeDraft {
+  issues?: string[];
+  name?: string;
+  createdAt?: string;
   items: RecoveryPhoto[];
   station: Station;
   defaults?: { material: string; thickness: number };
@@ -52,7 +56,7 @@ function completed(tx: IDBTransaction) {
   });
 }
 let writes = Promise.resolve();
-export function saveIntake(slot: "single" | "batch", draft: IntakeDraft) {
+export function saveIntake(slot: string, draft: IntakeDraft) {
   const write = async () => {
     const db = await open();
     try {
@@ -70,22 +74,26 @@ export function saveIntake(slot: "single" | "batch", draft: IntakeDraft) {
         if (!known.has(key)) tx.objectStore("files").put(item.file, key);
       }
       for (const key of known)
-        if (key.startsWith(slot + ":") && !current.has(key))
+        if (key.slice(0, key.lastIndexOf(":")) === slot && !current.has(key))
           tx.objectStore("files").delete(key);
       tx.objectStore("drafts").put(
         {
           version: 1,
+          issues: draft.issues,
+          name: draft.name,
+          createdAt: draft.createdAt,
           station: draft.station,
           defaults: draft.defaults,
           selectedId: draft.selectedId,
           items: draft.items.map(
-            ({ file, id, hash, label, fields, status, revision }) => ({
+            ({ file, id, hash, label, fields, status, revision, error }) => ({
               id,
               hash,
               label,
               fields,
               status,
               revision,
+              error,
               name: file.name,
               type: file.type,
               lastModified: file.lastModified,
@@ -103,9 +111,7 @@ export function saveIntake(slot: "single" | "batch", draft: IntakeDraft) {
   writes = next;
   return next;
 }
-export async function loadIntake(
-  slot: "single" | "batch",
-): Promise<IntakeDraft | null> {
+export async function loadIntake(slot: string): Promise<IntakeDraft | null> {
   const db = await open();
   try {
     const saved = await req(
@@ -153,11 +159,57 @@ export async function loadIntake(
     if (size > 100_000_000)
       throw new Error("The recovered queue exceeds the photo limit.");
     return {
+      issues: saved.issues,
+      name: saved.name,
+      createdAt: saved.createdAt,
       items,
       station: saved.station,
       defaults: saved.defaults,
       selectedId: saved.selectedId,
     };
+  } finally {
+    db.close();
+  }
+}
+export interface IntakeHistory {
+  id: string;
+  name: string;
+  createdAt?: string;
+  count: number;
+  accepted: number;
+  sheetIds: string[];
+}
+export async function listIntakeHistory(): Promise<IntakeHistory[]> {
+  if (!globalThis.indexedDB) return [];
+  const db = await open();
+  try {
+    const store = db.transaction("drafts").objectStore("drafts");
+    const [keys, rows] = await Promise.all([
+      req(store.getAllKeys()),
+      req(store.getAll()),
+    ]);
+    return rows
+      .flatMap((row, i) => {
+        const id = String(keys[i]);
+        if (!(id === "batch" || id.startsWith("batch:")) || !row.items?.length)
+          return [];
+        return [
+          {
+            id,
+            name: row.name || "Batch 1",
+            createdAt: row.createdAt,
+            count: row.items.length,
+            accepted: row.items.filter(
+              (item: RecoveryPhoto) => item.status === "added",
+            ).length,
+            // The server decides which of these physical IDs are currently usable.
+            sheetIds: row.items.map(
+              (item: RecoveryPhoto) => item.fields.sheet_id,
+            ),
+          },
+        ];
+      })
+      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   } finally {
     db.close();
   }

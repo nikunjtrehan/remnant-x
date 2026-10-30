@@ -8,6 +8,8 @@
 | One uploaded DXF plus a natural-language quantity | Yes; upload is attached to parsing, then the structured order is reviewed before nesting |
 | Multiple remnant photos | Yes; independent checks, settings, results and warehouse saves in one intake queue |
 | ZIP of remnant photos | Yes; JPEG/PNG files, including folders inside the archive |
+| Repeated ZIP uploads and history | Each new ZIP upload creates a named batch; earlier photos, statuses and import notices remain reopenable in this browser |
+| Select stock batches for a job | Choose one or more batches in Plan a job; the backend restricts candidate sheets to those IDs before nesting |
 | Many sheets in a manufacturing order | Yes; existing backend nesting and verification remain authoritative |
 | Review before stock eligibility | Yes; the desktop stores a pending analysis, overlays geometry on its photograph, and requires explicit acceptance |
 | Physical sheet IDs and rack/slot | Yes; stored location, printable stock labels, and sheet identity on the plan |
@@ -53,6 +55,22 @@ establish which individual feature caused a win.
 
 ## Batch semantics and limits
 
+- Batch history stores original photos and names in browser IndexedDB. New batch
+  also starts a separate group for loose photographs. Old single-queue data is
+  retained as Batch 1. This is workstation history, not a cross-device audit log.
+- Apply material to all unprocessed photos copies material and thickness to
+  photos that have not yet been analyzed. Existing reviews and accepted stock
+  are not edited by that action.
+- Check markers in photos validates marker visibility and calibration without
+  calling SAM. Find outlines & holes performs paid segmentation on ready photos;
+  each result must still be visually approved before it becomes inventory.
+- Failures appear beside their photos; exact duplicate imports appear in the
+  saved import notices. A new ZIP does not create a second physical sheet from
+  an already accepted photograph. Existing backend duplicate guards still apply.
+- Planning defaults to all compatible inventory. Selecting batch checkboxes
+  explicitly restricts planning to currently available stock IDs from those
+  groups. Empty selections and groups with no compatible remaining stock cannot
+  fall back to unselected sheets. Changing selection invalidates the old plan.
 - Up to 50 photos, 20 MB each, 100 MB total queued images. ZIP input is limited to
   100 MB; image counts/declared expansion sizes are checked before decoding.
 - ZIP contents are read in the browser using the documented

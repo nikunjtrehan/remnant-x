@@ -332,7 +332,11 @@ export function Capture({
         <div className="panel-heading">
           <span className="step-number">01</span>
           <div>
-            <h2>Start with a photograph.</h2>
+            <h2>
+              {batch
+                ? "Inspect this photo and review its geometry."
+                : "Start with a photograph."}
+            </h2>
             <p>All four corners. One flat sheet.</p>
           </div>
         </div>
@@ -671,7 +675,7 @@ export function Capture({
               type="submit"
             >
               <ScanLine size={15} />
-              Analyze for geometry review
+              Find outline & holes
             </button>
           </fieldset>
         </form>
@@ -727,7 +731,8 @@ export function Capture({
           <span className="badge neutral">
             {result
               ? geometrySourceLabel(
-                  result.saved_remnant?.inventory_source ?? result.inventory_source,
+                  result.saved_remnant?.inventory_source ??
+                    result.inventory_source,
                 )
               : "Live capture"}
           </span>

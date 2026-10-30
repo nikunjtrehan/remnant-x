@@ -5,6 +5,25 @@ import { PhotoBatch } from "./PhotoBatch";
 import { api } from "./api";
 import raw from "../public/example/recording.json";
 import type { IndexResult, Preflight } from "./types";
+import type { IntakeDraft } from "./recovery";
+const draftsInBrowser = vi.hoisted(() => new Map<string, IntakeDraft>());
+vi.mock("./recovery", async (original) => ({
+  ...(await original<typeof import("./recovery")>()),
+  loadIntake: async (id: string) => draftsInBrowser.get(id) || null,
+  saveIntake: async (id: string, draft: IntakeDraft) => {
+    draftsInBrowser.set(id, draft);
+  },
+  listIntakeHistory: async () =>
+    [...draftsInBrowser.entries()]
+      .filter(([id, draft]) => id.startsWith("batch") && draft.items.length)
+      .map(([id, draft]) => ({
+        id,
+        name: draft.name || "Batch 1",
+        count: draft.items.length,
+        accepted: 0,
+        sheetIds: draft.items.map((item) => item.fields.sheet_id),
+      })),
+}));
 vi.mock("./api", () => ({
   api: {
     preflight: vi.fn(),
@@ -41,6 +60,7 @@ const indexed: IndexResult = {
 };
 beforeEach(() => {
   vi.resetAllMocks();
+  draftsInBrowser.clear();
   localStorage.clear();
   vi.mocked(api.preflight).mockResolvedValue(ready);
   vi.mocked(api.index).mockResolvedValue(indexed);
@@ -57,15 +77,123 @@ async function importTwo() {
   ]);
   await screen.findByRole("button", { name: "Inspect photo 2: other.png" });
   await userEvent.click(
-    screen.getByRole("button", { name: "Check pending photos" }),
+    screen.getByRole("button", { name: "Check markers in photos" }),
   );
   await waitFor(() =>
     expect(
-      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
     ).toHaveProperty("disabled", false),
   );
 }
 describe("photo-batch workflow", () => {
+  it("opens a second named batch and returns to the first without losing photos", async () => {
+    const previousIndexedDB = globalThis.indexedDB;
+    vi.stubGlobal("indexedDB", {});
+    try {
+      render(<PhotoBatch onSaved={() => {}} />);
+      await waitFor(() =>
+        expect(screen.getByLabelText("Batch name")).toHaveProperty(
+          "disabled",
+          false,
+        ),
+      );
+      await importTwo();
+      await userEvent.clear(screen.getByLabelText("Batch name"));
+      await userEvent.type(screen.getByLabelText("Batch name"), "First ZIP");
+      await userEvent.click(screen.getByRole("button", { name: "New batch" }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("button", { name: "Inspect photo 1: good.png" }),
+        ).toBeNull(),
+      );
+      await userEvent.upload(
+        screen.getByLabelText("Batch station photos or ZIP"),
+        new File(["third"], "third.png", { type: "image/png" }),
+      );
+      await screen.findByRole("button", { name: "Inspect photo 1: third.png" });
+      await userEvent.selectOptions(
+        screen.getByLabelText("Batch history (this browser)"),
+        "batch",
+      );
+      await screen.findByRole("button", { name: "Inspect photo 2: other.png" });
+      expect(
+        screen.queryByRole("button", { name: "Inspect photo 1: third.png" }),
+      ).toBeNull();
+      expect(screen.getByLabelText("Batch name")).toHaveProperty(
+        "value",
+        "First ZIP",
+      );
+      expect(api.index).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal("indexedDB", previousIndexedDB);
+    }
+  });
+  it("can explicitly retry a restored failed photo after its markers are checked again", async () => {
+    const previousIndexedDB = globalThis.indexedDB;
+    vi.stubGlobal("indexedDB", {});
+    try {
+      const first = render(<PhotoBatch onSaved={() => {}} />);
+      await waitFor(() =>
+        expect(screen.getByLabelText("Batch name")).toHaveProperty(
+          "disabled",
+          false,
+        ),
+      );
+      await importTwo();
+      vi.mocked(api.index)
+        .mockRejectedValueOnce(new Error("ERR_SAM_NO_MATCH"))
+        .mockResolvedValue(indexed);
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Find outlines & holes in 2 photos",
+        }),
+      );
+      await screen.findByText("1 added · 0 ready · 1 need attention");
+      await waitFor(() =>
+        expect(draftsInBrowser.get("batch")?.items[0].status).toBe("error"),
+      );
+      first.unmount();
+      vi.mocked(api.review).mockRejectedValue(
+        new Error("ERR_REVIEW_NOT_FOUND"),
+      );
+      render(<PhotoBatch onSaved={() => {}} />);
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Find outline & holes" }),
+        ).toHaveProperty("disabled", false),
+      );
+      expect(api.index).toHaveBeenCalledTimes(2);
+      await userEvent.click(
+        screen.getByRole("button", { name: "Find outline & holes" }),
+      );
+      await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
+    } finally {
+      vi.stubGlobal("indexedDB", previousIndexedDB);
+    }
+  });
+  it("explicitly retries a failed selected photo with the revised SAM description", async () => {
+    vi.mocked(api.index)
+      .mockRejectedValueOnce(new Error("ERR_SAM_NO_MATCH"))
+      .mockResolvedValue(indexed);
+    render(<PhotoBatch onSaved={() => {}} />);
+    await importTwo();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
+    );
+    await screen.findByText("1 added · 0 ready · 1 need attention");
+    expect(api.index).toHaveBeenCalledTimes(2);
+    const concept = screen.getByLabelText("What should SAM find?");
+    await userEvent.clear(concept);
+    await userEvent.type(concept, "cardboard sheet");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Find outline & holes" }),
+    );
+    await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(api.index).mock.calls[2][2].segmentation_concept).toBe(
+      "cardboard sheet",
+    );
+    await screen.findByText("2 added · 0 ready · 0 need attention");
+  });
   it("keeps material edits bound to the remaining photo after removing the selected photo", async () => {
     render(<PhotoBatch onSaved={() => {}} />);
     await importTwo();
@@ -79,7 +207,7 @@ describe("photo-batch workflow", () => {
       "ss316",
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 1 photo" }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(1));
     expect(api.index).toHaveBeenCalledWith(
@@ -123,14 +251,14 @@ describe("photo-batch workflow", () => {
     render(<PhotoBatch onSaved={saved} />);
     await importTwo();
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
     );
     await screen.findByText(
       "0 added · 0 ready · 0 need attention · 2 awaiting review",
     );
     expect(saved).not.toHaveBeenCalled();
     await userEvent.click(
-      screen.getByRole("button", { name: "Check pending photos" }),
+      screen.getByRole("button", { name: "Check markers in photos" }),
     );
     expect(api.index).toHaveBeenCalledTimes(2);
     await userEvent.click(
@@ -158,11 +286,13 @@ describe("photo-batch workflow", () => {
     );
     expect(api.index).toHaveBeenCalledTimes(2);
     await userEvent.click(
-      screen.getByRole("button", { name: "Check pending photos" }),
+      screen.getByRole("button", { name: "Check markers in photos" }),
     );
-    await screen.findByRole("button", { name: "Analyze 1 ready photo" });
+    await screen.findByRole("button", {
+      name: "Find outlines & holes in 1 photo",
+    });
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 1 photo" }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
     expect(vi.mocked(api.index).mock.calls[2][2].review_id).not.toBe(oldId);
@@ -176,7 +306,7 @@ describe("photo-batch workflow", () => {
       remnants: [{ ...indexed.saved_remnant!, sheet_id: id }],
     });
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
     );
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
@@ -213,7 +343,7 @@ describe("photo-batch workflow", () => {
     );
     await screen.findByRole("button", { name: "Inspect photo 2: other.png" });
     await userEvent.click(
-      screen.getByRole("button", { name: "Check pending photos" }),
+      screen.getByRole("button", { name: "Check markers in photos" }),
     );
     await waitFor(() =>
       expect(
@@ -221,7 +351,7 @@ describe("photo-batch workflow", () => {
       ).toBeTruthy(),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 1 photo" }),
     );
     await screen.findByText("1 added · 0 ready · 1 need attention");
     expect(api.index).toHaveBeenCalledTimes(1);
@@ -232,7 +362,7 @@ describe("photo-batch workflow", () => {
     );
     expect(saved).toHaveBeenCalledTimes(1);
     await userEvent.click(
-      screen.getByRole("button", { name: "Check pending photos" }),
+      screen.getByRole("button", { name: "Check markers in photos" }),
     );
     expect(api.index).toHaveBeenCalledTimes(1);
   });
@@ -243,7 +373,7 @@ describe("photo-batch workflow", () => {
     render(<PhotoBatch onSaved={() => {}} />);
     await importTwo();
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
     );
     await screen.findByText("1 added · 0 ready · 1 need attention");
     expect(api.index).toHaveBeenCalledTimes(2);
@@ -260,7 +390,7 @@ describe("photo-batch workflow", () => {
     render(<PhotoBatch onSaved={() => {}} />);
     await importTwo();
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 2 ready photos" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(1));
     await userEvent.click(
@@ -276,9 +406,11 @@ describe("photo-batch workflow", () => {
       screen.getByLabelText("Batch station photos or ZIP"),
       new File(["good"], "good.png", { type: "image/png" }),
     );
-    await screen.findByRole("button", { name: "Analyze 1 ready photo" });
+    await screen.findByRole("button", {
+      name: "Find outlines & holes in 1 photo",
+    });
     await userEvent.click(
-      screen.getByRole("button", { name: "Analyze 1 ready photo" }),
+      screen.getByRole("button", { name: "Find outlines & holes in 1 photo" }),
     );
     expect(
       within(await screen.findByRole("alert")).getByText(/Supply material/),

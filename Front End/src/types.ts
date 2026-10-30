@@ -178,6 +178,7 @@ export interface Upload {
   hole_count: number;
 }
 export interface ProcessSettings {
+  selected_sheet_ids?: string[];
   machine_profile: "ISO_6983_GRBL" | "LINUXCNC_LASER";
   allow_demo_stock: boolean;
   lead_in_radius_mm: number;

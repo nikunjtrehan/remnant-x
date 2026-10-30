@@ -1,7 +1,7 @@
 # Desktop integration and publication review
 
 30 October 2026. Scope: the local desktop prototype, repository presentation and
-publication preparation. Public hosting and physical machine operation are separate.
+publication. Public app hosting and physical machine operation are separate.
 
 ## Current checks
 
@@ -12,7 +12,7 @@ publication preparation. Public hosting and physical machine operation are separ
 | TypeScript and Vite production build | Passed; 335.28 kB JS, 106.31 kB gzip |
 | npm dependency audit | Zero reported vulnerabilities |
 | Existing warning | Starlette/httpx test-client deprecation |
-| New GitHub Checks workflow | Prepared for Windows, Python 3.11 and Node 22; hosted execution awaits publication |
+| GitHub Checks workflow | Passed on Windows, Python 3.11 and Node 22: 184 backend tests, 42 frontend tests and production build |
 
 Local validation used Windows, Python 3.11 and Node 25.2.1. The first backend
 attempt encountered a missing parent directory for its test-output path.
@@ -83,9 +83,17 @@ sources, inspected commits and uncertainty about submission-time hosting.
 No Meta-authored “best README” rule or custom-domain requirement was verified.
 No domain purchase or public deployment was performed.
 
-The existing frontend milestones remain separate local commits. The final work
-is prepared for user review before the requested GitHub push. CI configuration
-is not represented as a successful hosted CI run.
+Following user approval, the complete reviewed state was published to
+[nikunjtrehan/remnant-x](https://github.com/nikunjtrehan/remnant-x) on `main`,
+preserving all 15 milestone commits after the previous backend publication.
+The reviewed frontend publication was `f8b5ec635a6b2f41e012ee1a6127bdc09a4045de`.
+[Its hosted Checks run passed](https://github.com/nikunjtrehan/remnant-x/actions/runs/41048316752):
+184 backend tests, 42 frontend tests across 11 files, TypeScript and production build.
+Repository About text and topics now describe the complete workbench.
+
+The final tracked-tree and unpublished-history audit found no excluded private
+paths or active provider credentials. Public GitHub source publication does not
+deploy the application; no public app host or custom domain was configured.
 
 ## Practical limits
 

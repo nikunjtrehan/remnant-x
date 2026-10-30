@@ -12,6 +12,7 @@ __pycache__/
 # OS & Build Artifacts
 .DS_Store
 node_modules/
+.vite/
 dist/
 *.tsbuildinfo
 .task-tmp/

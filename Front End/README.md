@@ -27,7 +27,8 @@ npm run check
 This runs interaction/unit checks and a production TypeScript/Vite build.
 `npm run preview` previews that build. Development proxying is not included in
 the production build: deployment needs a same-origin `/api` reverse proxy to
-FastAPI. Hosting and GitHub publication are separate future steps.
+FastAPI. Source is published on GitHub; public application hosting remains a
+separate deployment step.
 
 ## Workflows
 

@@ -1,7 +1,7 @@
 # Desktop workbench milestones
 
-The frontend lives here; FastAPI remains the only backend. Local milestone commits
-are review checkpoints. Publishing to GitHub is a separate step.
+The frontend lives here; FastAPI remains the only backend. Milestone commits
+are review checkpoints, preserved in the published GitHub history.
 
 | Milestone         | Deliverable                                                                                               | Acceptance                                                                                                  |
 | ----------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -153,5 +153,6 @@ Results are added after each milestone passes its checks.
   paths; retained engineering detail and source-backed winner/hosting research.
 - **184 backend tests, 42 frontend tests, TypeScript and production build pass.**
   See the final integration report for exact evidence and limits.
-- GitHub Checks is prepared; hosted execution and publication await the user's
-  review. No private photograph or production inventory is included.
+- Published after user approval with the matching backend contracts and separate
+  milestone history. The first hosted GitHub Checks run passed both suites and
+  the production build. No private photograph or production inventory is included.

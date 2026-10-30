@@ -1,5 +1,7 @@
 # Remnant X
 
+[![Checks](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
+
 **Turn the offcut you have into a cutting plan for the parts you need.**
 
 Remnant X is a desktop prototype for reviewing photographed sheet remnants,
@@ -150,7 +152,7 @@ See the [engineering reference](docs/ENGINEERING_GUIDE.md) for precise limits.
 From the root: `.\.venv\Scripts\python.exe -m pytest -q`.
 From `Front End`: `npm run check`. Tests use offline providers; live smoke tests
 are separate and opt-in. The [Checks workflow](.github/workflows/checks.yml)
-runs these checks on push and pull requests; its first hosted run awaits publication.
+runs these checks on push and pull requests. [View hosted results.](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
 
 [README and hosting research](docs/REPOSITORY_PRESENTATION_RESEARCH.md) records
 the inspected winner repositories and the source of each recommendation.

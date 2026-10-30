@@ -134,7 +134,9 @@ export function CuttingPlan({
               {stock.sheet_id}
             </strong>{" "}
             · {stock.material} · {stock.thickness_mm} mm ·{" "}
-            {stock.location || "Location not set — check the stock label"}
+            {example
+              ? "Recorded synthetic stock"
+              : stock.location || "Location not set — check the stock label"}
           </p>
         )}
         {stale && (

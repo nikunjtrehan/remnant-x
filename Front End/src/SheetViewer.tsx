@@ -58,7 +58,7 @@ export function SheetViewer({
   const groups = [...new Set(parts.map((p) => p.part_id))];
   const selectedPart = parts.find((p) => p.instance_id === selected);
   return (
-    <div className="viewer" aria-label={title}>
+    <div className={photo && showPhoto ? "viewer photo-review" : "viewer"} aria-label={title}>
       <div className="viewer-bar">
         <span className="micro">
           <Crosshair size={13} />{" "}
@@ -178,8 +178,8 @@ export function SheetViewer({
               d={geometryPath(geometry)}
               fill={photo && showPhoto ? "#a3d77a22" : "#e0e5db"}
               fillRule="evenodd"
-              stroke="#5d6f58"
-              strokeWidth={1.4}
+              stroke={photo && showPhoto ? "#d5ff70" : "#5d6f58"}
+              strokeWidth={photo && showPhoto ? 2.4 : 1.4}
               vectorEffect="non-scaling-stroke"
             />
             {geometry.holes.map((ring, i) => (
@@ -191,8 +191,8 @@ export function SheetViewer({
                     ? "transparent"
                     : "url(#" + pattern + "-hatch)"
                 }
-                stroke="#96a18f"
-                strokeWidth={1}
+                stroke={photo && showPhoto ? "#55e4ff" : "#96a18f"}
+                strokeWidth={photo && showPhoto ? 2.4 : 1}
                 vectorEffect="non-scaling-stroke"
               />
             ))}
@@ -325,8 +325,9 @@ export function SheetViewer({
       <div className="viewer-footer">
         <span>
           <i className="legend-dot stock-dot" />
-          Available material <i className="legend-dot hole-dot" />
-          Existing cutout
+          {photo && showPhoto ? "Detected outline" : "Available material"}{" "}
+          <i className="legend-dot hole-dot" />
+          {photo && showPhoto ? "Detected holes" : "Existing cutout"}
         </span>
         <span className="mono">
           {selectedPart

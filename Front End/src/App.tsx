@@ -173,13 +173,20 @@ export default function App() {
                 Live workspace
               </button>
             </div>
-            <button
-              className={`connection connection-button ${connected ? "" : "offline"}`}
-              onClick={() => void refresh()}
-            >
-              <i />
-              {connected ? "Backend connected" : "Backend offline · retry"}
-            </button>
+            {example ? (
+              <span className="connection">
+                <i />
+                Recorded example · no API needed
+              </span>
+            ) : (
+              <button
+                className={`connection connection-button ${connected ? "" : "offline"}`}
+                onClick={() => void refresh()}
+              >
+                <i />
+                {connected ? "Backend connected" : "Backend offline · retry"}
+              </button>
+            )}
           </div>
         </header>
         <div className="page-heading">

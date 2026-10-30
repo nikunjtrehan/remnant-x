@@ -13,7 +13,7 @@ import { api, downloadDxf, downloadText } from "./api";
 import { SheetViewer } from "./SheetViewer";
 import { PhotoRegion } from "./PhotoRegion";
 import { Busy, ErrorNotice, Field, loadLocal } from "./ui";
-import { formatNumber } from "./geometry";
+import { formatNumber, geometrySourceLabel } from "./geometry";
 import { defaultStation, validStation } from "./station";
 import { GeometryReview, StockLabelButton } from "./GeometryReview";
 import { errorGuidance } from "./errors";
@@ -726,13 +726,9 @@ export function Capture({
           </div>
           <span className="badge neutral">
             {result
-              ? (result.saved_remnant?.inventory_source ??
-                  result.inventory_source) === "sam"
-                ? "SAM 3.1"
-                : ((
-                    result.saved_remnant?.inventory_source ??
-                    result.inventory_source
-                  )?.replaceAll("_", " ") ?? "Indexed geometry")
+              ? geometrySourceLabel(
+                  result.saved_remnant?.inventory_source ?? result.inventory_source,
+                )
               : "Live capture"}
           </span>
         </div>
@@ -759,6 +755,15 @@ export function Capture({
             <SheetViewer
               geometry={result.geometry}
               title="Indexed remnant geometry"
+              photo={
+                result.review_image_base64 && result.review_frame
+                  ? {
+                      src: result.review_image_base64,
+                      width: result.review_frame.width_mm,
+                      height: result.review_frame.height_mm,
+                    }
+                  : undefined
+              }
             />
             <div className="metric-strip">
               <div>

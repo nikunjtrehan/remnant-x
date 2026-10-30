@@ -32,6 +32,19 @@ beforeEach(() => {
   );
 });
 describe("example and live separation", () => {
+  it("keeps the key-free example usable while exposing an unavailable live backend", async () => {
+    vi.mocked(api.health).mockRejectedValue(new Error("Backend unavailable"));
+    vi.mocked(api.inventory).mockRejectedValue(new Error("Backend unavailable"));
+    render(<App />);
+    await screen.findByText("Software verified");
+    expect(screen.getByText("Recorded example · no API needed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Backend offline · retry" })).toBeNull();
+    expect(api.index).not.toHaveBeenCalled();
+    expect(api.parse).not.toHaveBeenCalled();
+    expect(api.execute).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Live workspace" }));
+    expect(await screen.findByRole("button", { name: "Backend offline · retry" })).toBeTruthy();
+  });
   it("restores the live scanner view and batch tab without starting inference", async () => {
     const first = render(<App />);
     await screen.findByText("Software verified");

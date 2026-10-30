@@ -24,6 +24,10 @@ export function boundsOf(geometry: Geometry): [number, number, number, number] {
 }
 export const formatNumber = (n: number, digits = 1) =>
   new Intl.NumberFormat("en", { maximumFractionDigits: digits }).format(n);
+export function geometrySourceLabel(source?: string): string {
+  if (source === "sam" || source === "meta_sam_3.1") return "Meta SAM 3.1";
+  return source?.replaceAll("_", " ") ?? "Indexed geometry";
+}
 export function partDescription(p: import("./types").Part): string {
   if (p.shape_type === "rectangle") return `${p.width_mm} × ${p.height_mm} mm`;
   if (p.shape_type === "circle") return `Ø ${p.diameter_mm} mm`;

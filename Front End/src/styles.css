@@ -570,6 +570,20 @@ h1 span {
 .stock-dot {
   background: #b2c3a5;
 }
+.photo-review .viewer-bar > .micro {
+  background: #fafcf6ed;
+  color: #43533c;
+  border-radius: 5px;
+  padding: 7px;
+}
+.photo-review .stock-dot {
+  background: #d5ff70;
+  border: 1px solid #526b2b;
+}
+.photo-review .hole-dot {
+  background: #55e4ff;
+  border-color: #287380;
+}
 .hole-dot {
   background: repeating-linear-gradient(
     45deg,

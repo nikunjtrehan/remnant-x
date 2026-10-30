@@ -3,7 +3,7 @@ import { ArrowUpRight, Boxes, RefreshCw, Search, ScanLine } from "lucide-react";
 import { SheetViewer } from "./SheetViewer";
 import { Busy, ErrorNotice, Modal, Field } from "./ui";
 import { api, downloadText } from "./api";
-import { formatNumber } from "./geometry";
+import { formatNumber, geometrySourceLabel } from "./geometry";
 import type { Remnant } from "./types";
 import type { IndexResult } from "./types";
 import { GeometryReview } from "./GeometryReview";
@@ -134,9 +134,7 @@ export function Inventory({
                   {r.hole_count === 1 ? "" : "s"}
                 </small>
                 <span className="stock-source">
-                  {r.inventory_source === "sam"
-                    ? "SAM 3.1 capture"
-                    : r.inventory_source}
+                  {geometrySourceLabel(r.inventory_source)}
                 </span>
                 <small>{r.location || "Location not set"}</small>
               </span>
@@ -201,7 +199,7 @@ export function Inventory({
                 </div>
                 <div>
                   <strong className="source-value">
-                    {selected.inventory_source}
+                    {geometrySourceLabel(selected.inventory_source)}
                   </strong>
                   <span>source of geometry</span>
                 </div>

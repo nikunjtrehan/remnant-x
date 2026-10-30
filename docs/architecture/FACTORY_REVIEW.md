@@ -39,7 +39,7 @@ the desktop uses explicit optical review and saved-plan confirmation.
 
 ## Evidence
 
-41 frontend tests and 184 offline backend tests pass. The isolated browser
+42 frontend tests and 184 offline backend tests pass. The earlier isolated browser
 exercise verified missing-marker rejection, two analyses held outside inventory,
 reload recovery without additional perception calls, physical labels, a 50-copy
 DXF plan, exact-plan completion and blocked stale export.
@@ -47,3 +47,7 @@ DXF plan, exact-plan completion and blocked stale export.
 See the [factory scenario matrix](../../Front%20End/FACTORY_SCENARIOS.md) and
 [validation record](../../Front%20End/VALIDATION.md). These workflow tests used
 explicit offline perception and do not establish new live SAM accuracy.
+
+The subsequent [live desktop review](../FINAL_READINESS.md) used actual SAM and
+Baseten with separate storage, including photo ZIP intake, two accepted physical
+pieces, verified DXF/multi-sheet jobs and saved-plan recovery across API restart.

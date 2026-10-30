@@ -25,6 +25,8 @@ the same saved station configuration as single-photo capture. Per-photo material
 thickness, concept and optional rectified-image box are editable before analysis.
 A station change invalidates unchecked-photo calibration and region boxes.
 Completed reviews retain their immutable image, geometry and calibration frame.
+Accepted captures keep the saved-photo comparison available. Bright outline and
+hole colours distinguish model geometry from the photograph without changing it.
 
 ## Research applied
 

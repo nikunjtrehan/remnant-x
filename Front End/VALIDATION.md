@@ -2,12 +2,12 @@
 
 ## Automated checks
 
-- `npm run check`: **41 frontend tests passed**, followed by TypeScript and
+- `npm run check`: **42 frontend tests passed**, followed by TypeScript and
   Vite production build. The suite includes actual IndexedDB file round trips,
   immutable review approval/retry, rejected-review recovery, StrictMode draft
   hydration, retained workspace mode, stale export blocking and preservation of
   material edits after removing the selected photo.
-- Full offline backend suite: **184 passed in 70.15 seconds**. The eight new
+- Full offline backend suite: **184 passed in 49.14 seconds**. The eight
   review-workflow tests cover approval eligibility, replay-safe acceptance,
   physical-ID collisions, rejected/cropped review refusal, restart recovery,
   exact-plan confirmation without renesting, stale batch rollback, location
@@ -16,7 +16,21 @@
 - Dependency installation audit: zero known vulnerabilities. The new
   `fake-indexeddb` package is a development-only test dependency.
 
-## Current factory browser exercise
+## Final live browser exercise
+
+The [final integration review](../docs/FINAL_READINESS.md) records the actual UI
+using real SAM and Baseten with isolated storage: a three-photo ZIP with a
+covered-marker rejection, two accepted stock pieces, a 50-copy vendor DXF order,
+verified browser download, saved-plan recovery and nine rectangles across both
+sheets. Preview/download did not consume stock. The example was separately
+checked with the API stopped.
+
+The final UI review improved photo-overlay contrast, retained the saved photo
+after acceptance and clarified example/backend status. Toggling the photo left
+contour paths unchanged. All 42 frontend tests and the production build passed;
+the new regression checks example availability alongside a real live-mode outage.
+
+## Earlier offline factory browser exercise
 
 The UI used an isolated origin/port, database and artifacts under
 `.task-tmp/factory-qa`. Perception was explicitly replaced with local-threshold
@@ -71,9 +85,9 @@ saved-plan confirmation flow above.
 
 ## Scope and limits
 
-- No new live SAM accuracy or paid provider test was performed in this exercise.
-  The public example is synthetic/local-threshold; physical test photos remain
-  private.
+- The earlier offline browser exercise substituted perception; the later live
+  exercise above used real SAM and Baseten. The public example remains
+  synthetic/local-threshold and physical source photos remain private.
 - Glare, blur, occlusion, overlap and flatness require the documented visual
   checks. Automatic dimensional or image-quality certification is not claimed.
 - Browser recovery requires available storage and the same origin. Clearing

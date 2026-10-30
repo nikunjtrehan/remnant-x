@@ -1,7 +1,9 @@
 # Repository audit and winner-source review
 
 29 October 2026. Scope: backend, tests, evaluation tooling and architectural evidence.
-No frontend or machine connection was added. No winner code was copied or executed.
+This backend milestone added no frontend or machine connection. The subsequent
+[desktop integration review](../FINAL_READINESS.md) records the completed UI,
+current tests and two-piece physical follow-up. No winner code was copied or executed.
 
 ## What the public winner sources actually show
 

@@ -1,9 +1,14 @@
 # Backend capabilities and promise audit
 
-Audit date: 29 October 2026. This milestone implements the photo-to-inventory,
+Audit date: 29 October 2026; evidence updated 30 October 2026.
+This milestone implements the photo-to-inventory,
 order-to-nesting and verified-output backend. Physical acceptance and the explicit
 architectural deviations below remain open. It is a software planning prototype;
 it does not operate a machine.
+
+The desktop and its required review/plan API contracts are now implemented.
+Current evidence is in the [final integration review](../FINAL_READINESS.md).
+Historical test runs below retain their original counts and timings.
 
 The intended workflow combines SAM topology segmentation, calibrated CAD polygons,
 material-aware multi-sheet inventory, natural-language or uploaded-DXF orders,
@@ -15,9 +20,9 @@ transcripts and handoff notes are excluded from the public repository.
 
 | Capability or original design claim | Current implementation and evidence | Status |
 | --- | --- | --- |
-| Real SAM 3.1 topology segmentation | Meta Responses integration and official mask decoding; synthetic tests, live connectivity and the first calibrated cardboard capture. | One piece and one L-shaped hole recovered; physical accuracy acceptance pending. |
+| Real SAM 3.1 topology segmentation | Meta Responses integration and official decoding; two cardboard specimens, five usable views with correct topology and three blocked captures, followed by a real browser workflow. | Demonstrated within the measured cardboard scope; uniform physical accuracy acceptance pending. |
 | Homography and millimetre CAD polygons | Four-marker, 16-corner planar calibration; polygon/DXF output. Contour approximation is called with zero simplification tolerance by default. | Implemented within stated station assumptions; physical accuracy unproven. |
-| All internal holes preserved | Polygon interiors retained from the selected mask. The first real specimen's L-shaped hole was recovered without mask cleanup. | One specimen tested; not a guarantee of every hole on arbitrary stock. |
+| All internal holes preserved | Selected-mask interiors retained without cleanup; demonstrated an L opening and a second specimen with rectangular/circular holes and an exterior notch. | Two specimens tested; not a guarantee of every hole on arbitrary stock. |
 | Spatial warehouse inventory | SQLite stores polygon geometry and material/thickness/provenance; local geometry supplies spatial operations. This is not an LLM-resident inventory graph. | Workflow implemented; architecture differs from the draft's framing. |
 | Muse Spark 1.3 uses a 1M context to filter warehouse stock | Baseten Muse Spark Open is the default; direct Meta Muse Spark 1.3 parsing is configurable. Models interpret filter requirements; local SQL enforces exact identities and thickness. Warehouse contents are not sent as a 1M-token prompt. | Named model supported; the million-token warehouse-prompt architecture is deliberately not adopted. This is a deviation, not literal fulfilment of that sentence. |
 | Exact grade, thickness, grain and kerf constraints | Exact material identities, thickness filtering, restricted rotations and placement clearances, with deterministic checks. | Implemented within the documented numerical tolerances. |
@@ -63,13 +68,15 @@ That workload uses two synthetic DXF definitions: 70 plates with internal holes 
 Initial audit corrections passed 125 tests. After backend completion work, the full offline suite passed **164 tests, 0 failures, 0 skips** in **96.79 seconds** on this machine. In that suite, the 105-instance test took 11.80 seconds and the 101-file test took 60.07 seconds, including setup, uploads, execution and assertions. The physical-capture follow-up added three regression cases and two small geometry fixes; the latest full suite passed **167 tests, 0 failures, 0 skips** in **75.01 seconds**. A separate profiled 101-file run took 47.27 seconds. These are workload observations, not isolated nesting latency or performance guarantees. One Starlette/httpx
 deprecation warning remains. Test source: [test_promise_acceptance.py](../../backend/tests/test_promise_acceptance.py).
 
-The backend now includes NFP/annealing, prepared Muse Code emitters, bounded arcs and explicit process inputs. Hardware feedback and frontend implementation remain outside this work. The regression suite makes no model calls. Separate explicit live probes verified real Muse Code generation, Baseten parsing and Fireworks repair of an injected invalid fixture; see the [repository review](REPOSITORY_AUDIT.md).
+The backend includes NFP/annealing, prepared Muse Code emitters, bounded arcs and explicit process inputs. The desktop follow-up adds reviewed photo intake and exact-plan recovery/confirmation; hardware feedback remains outside scope. Current local checks pass 184 backend tests and 42 frontend tests plus the production build. The regression suite makes no model calls. Separate live probes verified real Muse Code generation, Baseten parsing and Fireworks repair of an injected invalid fixture; see the [repository review](REPOSITORY_AUDIT.md).
 
 ## Work still required
 
-- Extend the initial [physical ground-truth experiment](PHYSICAL_VALIDATION.md)
-  across new captures, with explicit error limits before dimensional claims.
+- Extend the [two-piece physical experiment](PHYSICAL_VALIDATION_20261030.md)
+  to more materials and capture conditions before general dimensional claims.
+  Exterior error reached 7.32 mm; no real-machine process is qualified.
 - The original algorithm and tool-generation commitments have backend implementations and tests. Retain the documented complexity/controller bounds and avoid describing heuristic search as a global optimum. The million-token warehouse prompt and broad physical safety guarantee remain explicit deviations; better wording cannot make those literal matches.
 - Establish the intended meaning and bounded acceptance test for correction loops
   before describing them as autonomous or real-time manufacturing control.
-- Demonstrate the frontend workflow later; it is outside this audit's implementation.
+- Retain the demonstrated [desktop workflow](../FINAL_READINESS.md) and its
+  explicit review, stock identity and exact-plan boundaries.

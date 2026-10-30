@@ -11,7 +11,7 @@ Demo stock is still seeded explicitly in the UI, never at startup.
 In a second PowerShell terminal:
 
 ```powershell
-Set-Location 'D:\remnant-X\Front End'
+Set-Location 'Front End'
 npm ci
 npm run dev
 ```

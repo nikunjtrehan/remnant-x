@@ -141,3 +141,17 @@ Results are added after each milestone passes its checks.
 - No paid model request, production inventory update or GitHub publication was
   performed. Visual quality checks and the remaining operating limits are
   documented in FACTORY_SCENARIOS.md.
+
+### Milestone 8 · Live integration and presentation review
+
+- Exercised original phone photographs through ZIP intake, real SAM, visual
+  acceptance, stock identity, real Baseten parsing, DXF upload, verified output
+  and browser download in isolated storage. A second job used both sheets.
+- Kept saved-photo inspection after acceptance and improved outline/hole contrast,
+  readable model provenance and key-free example status.
+- Reworked the README around an actual example screenshot and reproducible entry
+  paths; retained engineering detail and source-backed winner/hosting research.
+- **184 backend tests, 42 frontend tests, TypeScript and production build pass.**
+  See the final integration report for exact evidence and limits.
+- GitHub Checks is prepared; hosted execution and publication await the user's
+  review. No private photograph or production inventory is included.

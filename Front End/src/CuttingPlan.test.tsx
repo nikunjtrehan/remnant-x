@@ -36,6 +36,10 @@ describe("sheet-specific artifacts", () => {
         onCommit={() => {}}
       />,
     );
+    expect(screen.getByText("Stock order · smallest usable remnant first")).not.toBeNull();
+    const allocation = document.querySelector(".stock-allocation")!;
+    expect(allocation.textContent).toContain("still needed");
+    expect(allocation.textContent).toContain("SECOND_SHEET");
     await userEvent.click(screen.getByRole("tab", { name: /Sheet 2/ }));
     await userEvent.click(
       screen.getByRole("button", { name: "Download G-code" }),

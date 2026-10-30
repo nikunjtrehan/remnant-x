@@ -456,3 +456,38 @@ it("sends only selected batch sheet IDs and blocks an empty stock selection", as
   await userEvent.click(screen.getByRole("button", { name: /Nest & verify/ }));
   expect(api.execute).toHaveBeenCalledTimes(1);
 });
+
+
+it("uses visible stock context for a short DXF copy request and discloses conversion", async () => {
+  vi.mocked(api.upload).mockResolvedValue({
+    filename: "curves.dxf", dxf_path: "managed/curves.dxf", geometry, hole_count: 5,
+    import_info: { source_units: "centimetres", scale_to_mm: 10, spline_count: 6, curve_tolerance_mm: 0.05 },
+  });
+  vi.mocked(api.parse).mockResolvedValue({
+    order: { ...order, parts: [{ part_id: "VENDOR", shape_type: "dxf_file", quantity: 10, dxf_path: "managed/curves.dxf" }] },
+    llm_trace: {},
+  });
+  render(<Plan {...props} inventory={result.candidate_sheets} />);
+  await userEvent.upload(screen.getByLabelText("Vendor DXF files"), new File(["dxf"], "curves.dxf"));
+  await screen.findByText("curves.dxf");
+  expect((screen.getByLabelText("DXF material and thickness") as HTMLSelectElement).selectedOptions[0].textContent).toBe("ss304 · 3 mm");
+  expect(screen.getByText(/centimetres → mm/).textContent).toContain("0.05 mm chord tolerance");
+  await userEvent.type(screen.getByLabelText("Manufacturing request"), "I want to cut 10 copies of this.");
+  await userEvent.click(screen.getByRole("button", { name: "Review order" }));
+  await screen.findByLabelText("Quantity · VENDOR");
+  expect((screen.getByLabelText("Quantity for curves.dxf 1") as HTMLInputElement).value).toBe("10");
+  expect(api.parse).toHaveBeenCalledWith("I want to cut 10 copies of this.", ["managed/curves.dxf"],
+    { material: "ss304", thickness_mm: 3, kerf_mm: 1 });
+});
+
+it("requires a stock choice when an uploaded job has multiple grades available", async () => {
+  vi.mocked(api.upload).mockResolvedValue({ filename: "part.dxf", dxf_path: "managed/part.dxf", geometry, hole_count: 0 });
+  render(<Plan {...props} inventory={[...result.candidate_sheets, {...result.candidate_sheets[0], sheet_id: "S2", material: "ss316"}]} />);
+  await userEvent.upload(screen.getByLabelText("Vendor DXF files"), new File(["dxf"], "part.dxf"));
+  await screen.findByText("part.dxf");
+  const select = screen.getByLabelText("DXF material and thickness") as HTMLSelectElement;
+  expect(select.value).toBe("");
+  expect(select.options.length).toBe(3);
+  await userEvent.selectOptions(select, JSON.stringify(["ss316", 3]));
+  expect(select.selectedOptions[0].textContent).toBe("ss316 · 3 mm");
+});

@@ -393,12 +393,11 @@ class SparkWarehouseOrchestrator:
             raise ValueError("ERR_MULTIPLE_MATERIALS: use separate orders")
         if explicit:
             material = next(iter(explicit))
-        thick_match = re.search(
-            r"(\d+(?:\.\d+)?)\s*mm\s*(?:thick|sheet|plate|steel|stainless|aluminum|aluminium|acrylic|brass|copper)",
+        thick_matches = list(re.finditer(
+            r"(\d+(?:\.\d+)?)\s*mm\s*(?:thick|sheet|plate|steel|stainless|aluminum|aluminium|acrylic|brass|copper|cardboard)",
             text,
-        ) or re.search(
-            r"(?:from|on)\s+(\d+(?:\.\d+)?)\s*mm\b", text
-        )
+        )) + list(re.finditer(r"(?:from|on|use)\s+(\d+(?:\.\d+)?)\s*mm\b", text))
+        thick_match = thick_matches[0] if thick_matches else None
         thickness_mm = float(thick_match.group(1)) if thick_match else 0.0
         if not material or not thickness_mm:
             raise ValueError("ERR_AMBIGUOUS_ORDER: specify material and sheet thickness, or use structured order")
@@ -409,11 +408,10 @@ class SparkWarehouseOrchestrator:
 
         parts: List[Dict[str, Any]] = []
         p_idx = 1
-        if thick_match:
-            spans.append(thick_match.span())
-        kerf_match = re.search(r"kerf\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*mm", text)
-        if kerf_match:
-            spans.append(kerf_match.span())
+        spans.extend(m.span() for m in thick_matches)
+        kerf_matches = list(re.finditer(r"kerf\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)\s*mm", text))
+        kerf_match = kerf_matches[0] if kerf_matches else None
+        spans.extend(m.span() for m in kerf_matches)
         for alias in MATERIAL_SYNONYMS:
             spans.extend(m.span() for m in re.finditer(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])", text))
         if grade:
@@ -422,7 +420,7 @@ class SparkWarehouseOrchestrator:
         # 1. Uploaded vendor DXF files mentioned in prompt (e.g. "50 of the uploaded dxf/gear")
         for dxf_file in uploaded_dxf_files or []:
             dxf_qty_match = re.search(
-                r"(\d+)\s*(?:x|(?:copies|pcs|pieces|units|quantity)(?:\s+of)?|of)?\s*(?:the\s+)?(?:uploaded|custom|dxf|cad|part|file|gear|bracket|plate)",
+                r"(\d+)\s*(?:x|(?:copies|pcs|pieces|units|quantity)(?:\s+of)?|of)?\s*(?:the\s+)?(?:uploaded|custom|dxf|cad|part|file|gear|bracket|plate|this|it)",
                 text,
             )
             if not dxf_qty_match:
@@ -523,7 +521,7 @@ class SparkWarehouseOrchestrator:
             remainder[start:end] = " " * (end - start)
         remainder = "".join(remainder)
         words = set(re.findall(r"[a-z0-9_]+", remainder))
-        allowed_words = set("cut make need want please i we from on sheet sheets stock mm thick thickness material with and plus of the a an in diameter inner outer od id solid hollow uploaded dxf cad custom file part parts grain locked lock fixed steel stainless aluminum aluminium acrylic brass copper titanium mild carbon galvanized quantity units pcs pieces x by at kerf".split())
+        allowed_words = set("cut make need want please i we to use from on sheet sheets stock mm thick thickness material with and plus of the a an in diameter inner outer od id solid hollow uploaded dxf cad custom file part parts grain locked lock fixed steel stainless aluminum aluminium acrylic brass copper titanium mild carbon galvanized quantity units pcs pieces x by at kerf".split())
         if words - allowed_words:
             raise ValueError("ERR_UNPARSED_ORDER: unsupported or ambiguous clause; use a structured order")
         payload = {

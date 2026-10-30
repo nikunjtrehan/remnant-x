@@ -8,6 +8,7 @@ from shapely import affinity, constrained_delaunay_triangles
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
+from shapely.prepared import prep
 
 from backend.db_and_parts import CADPartFactory, CADPartSpec, RemnantRecord
 
@@ -120,8 +121,9 @@ class BatchNestingResult:
 class HoleAwareNester:
     """Hole-aware NFP placement, bounded parallel annealing and independent checks.
 
-    coarse_step_mm/fine_step_mm remain accepted for older callers; NFP placement
-    uses contact vertices rather than a grid. iterations controls annealing work.
+    NFP placement uses contact vertices. If its complexity budget is exceeded,
+    a bounded grid proposes placements checked against unchanged stock/parts.
+    fine_step_mm sets the grid target, capped at 101 points per axis.
     """
 
     def __init__(
@@ -189,9 +191,25 @@ class HoleAwareNester:
 
         return True, "VERIFIED_SAFE"
 
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _placement_angles(sheet, grain_locked):
+        if grain_locked:
+            return (0.0, 180.0)
+        angles = (0.0, 90.0, 180.0, 270.0)
+        # Photo-derived stock can be rotated relative to station XY. Preserve
+        # station-aligned choices and also try the sheet's rectangular frame.
+        a, b = list(sheet.minimum_rotated_rectangle.exterior.coords)[:2]
+        offset = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) % 90
+        if min(offset, 90 - offset) > 0.1:
+            angles += tuple(offset + 90 * i for i in range(4))
+        return angles
+
     def _find_best_pose_on_sheet(self, part_spec, free_space, raw_sheet_poly, already_placed):
         del free_space  # NFPs encode raw-stock voids and placed solids directly.
         kerf = self.kerf_mm
+        covered_stock = prep(raw_sheet_poly.buffer(1e-8))
+        stock_boundary = raw_sheet_poly.boundary
         sx0, sy0, sx1, sy1 = raw_sheet_poly.bounds
         voids = box(sx0, sy0, sx1, sy1).difference(raw_sheet_poly)
         obstacles = ([voids] if voids.geom_type == "Polygon" and not voids.is_empty
@@ -206,7 +224,7 @@ class HoleAwareNester:
 
         best = None
         seen = []
-        for angle in ([0, 180] if part_spec.grain_locked else [0, 90, 180, 270]):
+        for angle in self._placement_angles(raw_sheet_poly, part_spec.grain_locked):
             moving = self._rotate_and_normalize(part_spec.polygon, angle)
             if any(moving.equals(previous) for previous in seen):
                 continue
@@ -224,25 +242,34 @@ class HoleAwareNester:
             # Circumscribe the round-buffer polygon so its chords do not
             # understate clearance between NFP contacts and curved boundaries.
             footprint = moving.buffer(kerf / math.cos(math.pi / 32), quad_segs=8) if kerf else moving
-            forbidden = unary_union([
-                affinity.translate(no_fit_polygon(obstacle, footprint), ox, oy)
-                for obstacle, ox, oy in normalized_obstacles])
-            feasible = domain.difference(forbidden)
-            # Include contacts for exact-fit line/point domains: closed polygon
-            # difference can remove their legal touching translations entirely.
-            candidates = vertices(feasible) + vertices(domain)
-            if not forbidden.is_empty:
-                candidates += vertices(forbidden.boundary.intersection(domain))
+            try:
+                forbidden = unary_union([
+                    affinity.translate(no_fit_polygon(obstacle, footprint), ox, oy)
+                    for obstacle, ox, oy in normalized_obstacles])
+                feasible = domain.difference(forbidden)
+                # Include contacts for exact-fit line/point domains: closed polygon
+                # difference can remove their legal touching translations entirely.
+                candidates = vertices(feasible) + vertices(domain)
+                if not forbidden.is_empty:
+                    candidates += vertices(forbidden.boundary.intersection(domain))
+            except ValueError as exc:
+                if not str(exc).startswith("ERR_NFP_COMPLEXITY"):
+                    raise
+                self._grid_fallback_used = True
+                nx = max(1, min(100, math.ceil((x1 - x0) / self.fine_step_mm)))
+                ny = max(1, min(100, math.ceil((y1 - y0) / self.fine_step_mm)))
+                candidates = [(x0 + (x1 - x0) * ix / nx, y0 + (y1 - y0) * iy / ny)
+                              for iy in range(ny + 1) for ix in range(nx + 1)]
             for x, y in sorted(set(candidates), key=lambda p: (p[1], p[0])):
                 if best is not None and (y, x) >= best[:2]:
                     break
                 candidate = affinity.translate(moving, x, y)
-                if not raw_sheet_poly.buffer(1e-8).covers(candidate):
+                if not covered_stock.covers(candidate):
                     continue
-                if kerf and candidate.distance(raw_sheet_poly.boundary) < kerf - 1e-6:
+                if kerf and candidate.distance(stock_boundary) < kerf - 1e-6:
                     continue
-                if any(candidate.intersection(p.polygon).area > 1e-8 or
-                       candidate.distance(p.polygon) < kerf - 1e-6 for p in already_placed):
+                if any(candidate.distance(p.polygon) < kerf - 1e-6 or
+                       candidate.intersection(p.polygon).area > 1e-8 for p in already_placed):
                     continue
                 valid, _ = self.verify_placement_sanitizer(candidate, raw_sheet_poly, already_placed, kerf)
                 if valid:
@@ -400,6 +427,7 @@ class HoleAwareNester:
         return missed * 1e6 + used / total_area * 1000 + result.sheets_used * 10 + envelope / total_area
 
     def nest_batch_across_sheets(self, sheets, part_specs):
+        self._grid_fallback_used = False
         seed_order = [f"{p.part_id}_{i:03d}"
                       for p in sorted(part_specs, key=lambda p: (p.envelope_area_mm2, p.solid_area_mm2), reverse=True)
                       for i in range(1, p.quantity + 1)]
@@ -442,7 +470,11 @@ class HoleAwareNester:
                              "iterations_per_chain": self.iterations, "seed": self.seed,
                              "layouts_evaluated": sum(r[2] for r in results),
                              "accepted_worse_moves": sum(r[3] for r in results),
-                             "nfp_convex_pair_limit": 20000, "globally_optimal": False}
+                             "nfp_convex_pair_limit": 20000, "globally_optimal": False,
+                             "complexity_fallback": "bounded_grid" if self._grid_fallback_used else None,
+                             "grid_max_positions_per_orientation": 10201,
+                             "rotation_policy": "station_and_sheet_frame",
+                             "grain_locked_rotation_policy": "station_0_180"}
         return best
 
 

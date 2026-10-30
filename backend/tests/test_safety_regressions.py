@@ -194,10 +194,10 @@ def test_upload_then_make_fifty_verified_parts(tmp_path):
     assert data["timings_ms"]["total_ms"] > 0
 
 
-@pytest.mark.parametrize("kind", ["circle", "open", "bulge", "outside", "inches"])
+@pytest.mark.parametrize("kind", ["circle", "open", "bulge", "outside", "unsupported_units"])
 def test_unsupported_dxf_rejected(tmp_path, kind):
     doc = ezdxf.new("R2010")
-    doc.units = 1 if kind == "inches" else 4
+    doc.units = 7 if kind == "unsupported_units" else 4
     msp = doc.modelspace()
     if kind == "circle":
         msp.add_circle((10, 10), 5)

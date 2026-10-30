@@ -97,3 +97,40 @@ def test_common_rectangle_notation_remains_supported(size):
 def test_offline_parser_does_not_treat_stock_thickness_as_missing_disc_diameter():
     with pytest.raises(ValueError, match='ERR_ORDER_NEEDS_CLARIFICATION'):
         SparkWarehouseOrchestrator.fallback_regex_parse_prompt('Cut 5 discs from 3 mm SS304 sheet, kerf 1 mm.')
+
+
+@pytest.mark.parametrize('description', [
+    'circular parts, each with a radius of 20 mm (2 cm)',
+    'circles of radius 2 cm',
+    'circles of 20 mm radius',
+    'circles with diameter 40 mm',
+    'circular pieces, radius 20 mm, diameter 40 mm',
+])
+def test_circle_radius_and_equivalent_units_are_grounded(description):
+    prompt = f'Cut 10 {description}, from 3 mm thick cardboard. Use a kerf of 1 mm.'
+    payload = {'material': 'cardboard', 'thickness_mm': 3, 'kerf_mm': 1,
+               'parts': [{'part_id': 'DISC', 'shape_type': 'circle', 'quantity': 10, 'diameter_mm': 40}]}
+    model = FixedModel(payload)
+    spec = SparkWarehouseOrchestrator(None, model).parse_natural_language_order_via_spark(prompt)
+    assert spec.parts[0].diameter_mm == 40
+    assert spec.parts[0].quantity == 10
+    assert model.calls == 1
+    payload['parts'][0]['diameter_mm'] = 20
+    with pytest.raises(ValueError, match='ERR_ORDER_NEEDS_CLARIFICATION'):
+        check_order_intent(inspect_order_prompt(prompt), payload)
+
+
+@pytest.mark.parametrize('description', [
+    'radius 20 mm (3 cm)',
+    'radius 20 mm, diameter 20 mm',
+    'radius 20 mm and radius 30 mm',
+    'diameter 40 mm and diameter 50 mm',
+    'radius 20 mm and 30 mm',
+    '40x30mm',
+])
+def test_conflicting_circle_measurements_stop_before_model(description):
+    model = FixedModel(None)
+    with pytest.raises(ValueError, match='ERR_ORDER_NEEDS_CLARIFICATION'):
+        SparkWarehouseOrchestrator(None, model).parse_natural_language_order_via_spark(
+            f'Cut 10 circular parts with {description} from 3 mm cardboard, kerf 1 mm.')
+    assert model.calls == 0

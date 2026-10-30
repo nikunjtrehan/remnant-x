@@ -18,7 +18,7 @@ MEASURE = rf'(?P<value>{NUMBER})\s*(?P<unit>{UNIT})(?![a-z])'
 WORDS = dict(zip('one two three four five six seven eight nine ten eleven twelve'.split(), range(1, 13)))
 WORDS.update(a=1, an=1, single=1, dozen=12)
 COUNT = r'(?:\d+|a|an|single|dozen|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)'
-SHAPES = re.compile(r'\b(l[ -]?brackets?|squares?(?:\s+plates?)?|rectangular\s+plates?|rectangles?|rects?|plates?|panels?|strips?|rings?|washers?|flanges?|donuts?|circles?|discs?|disks?|pins?)\b')
+SHAPES = re.compile(r'\b(l[ -]?brackets?|squares?(?:\s+plates?)?|rectangular\s+plates?|rectangles?|rects?|plates?|panels?|strips?|rings?|washers?|flanges?|donuts?|circular\s+(?:parts?|pieces?|plates?)|circles?|discs?|disks?|pins?)\b')
 
 
 def clarify(message):
@@ -71,8 +71,37 @@ def labelled_dimension(text, label):
     return None
 
 
+def normalize_equivalent_units(text):
+    """Remove only an explicitly equivalent parenthesized unit restatement."""
+    pattern = rf'{MEASURE}\s*\(\s*(?P<alias_value>{NUMBER})\s*(?P<alias_unit>{UNIT})\s*\)'
+    def replace(match):
+        alias = re.fullmatch(MEASURE, match.group('alias_value') + ' ' + match.group('alias_unit'))
+        if abs(millimeters(match) - millimeters(alias)) > 1e-5:
+            clarify('The parenthesized measurement conflicts with the first measurement.')
+        return match.group('value') + ' ' + match.group('unit')
+    return re.sub(pattern, replace, text)
+
+
+def circle_diameter(context, offset, excluded):
+    values, labelled = [], []
+    for match in re.finditer(MEASURE, context):
+        span = (offset + match.start(), offset + match.end())
+        if any(span[0] < end and start < span[1] for start, end in excluded):
+            continue
+        before = re.search(r'\b(radius|diameter|diam|dia)\s*(?:of|is|:|=)?\s*$', context[:match.start()])
+        after = re.match(r'\s*(radius|diameter|diam|dia)\b', context[match.end():])
+        label = before or after
+        values.append(millimeters(match) * (2 if label and label.group(1) == 'radius' else 1))
+        labelled.append(bool(label))
+    if not values or len(dimensions(context, offset, excluded)) != len(values) or (len(values) > 1 and not all(labelled)):
+        clarify('Specify a circle radius or diameter, with units.')
+    if any(abs(value - values[0]) > 1e-5 for value in values):
+        clarify('Circle radius and diameter measurements conflict; diameter must be twice the radius.')
+    return values[0]
+
+
 def inspect_order_prompt(prompt, uploads=()):
-    text = prompt.lower()
+    text = normalize_equivalent_units(prompt.lower())
     if re.search(r"\beither\b.{0,100}\bor\b|\b(?:undecided|unsure)\b|\bnot\s+(?:yet\s+)?decided\b|\b(?:do not|don't)\s+know\b|\bbetween\s+\d+\s+and\s+\d+\b|\b\d+\s+or\s+\d+\b", text, re.S):
         clarify('Resolve the alternative quantities or conflicting requirements before submitting the order.')
     if re.search(rf'[-+]\s*{MEASURE}', text):
@@ -91,9 +120,11 @@ def inspect_order_prompt(prompt, uploads=()):
     if len(values) != 1:
         clarify('Specify one unambiguous sheet thickness.')
     excluded = [m.span() for m in thickness]
-    kerf = re.search(rf'\bkerf\s*(?:of|is|:|=)?\s*{MEASURE}', text)
-    if kerf:
-        excluded.append(kerf.span())
+    kerfs = list(re.finditer(rf'\bkerf\s*(?:of|is|:|=)?\s*{MEASURE}', text))
+    if len({round(millimeters(m), 6) for m in kerfs}) > 1:
+        clarify('Specify one unambiguous kerf; the prompt and job settings conflict.')
+    kerf = kerfs[0] if kerfs else None
+    excluded.extend(m.span() for m in kerfs)
     nodes = []
     for match in SHAPES.finditer(text):
         # "from 3 mm steel plate" names stock, not another requested part.
@@ -121,7 +152,7 @@ def inspect_order_prompt(prompt, uploads=()):
         name = match.group()
         shape = ('l_bracket' if name.startswith(('l-', 'l ', 'lbracket')) else
                  'ring' if name.startswith(('ring', 'washer', 'flange', 'donut')) else
-                 'circle' if name.startswith(('circle', 'disc', 'disk', 'pin')) else 'rectangle')
+                 'circle' if name.startswith(('circle', 'circular', 'disc', 'disk', 'pin')) else 'rectangle')
         item = {'shape_type': shape, 'quantity': count, 'grain_locked': grain_locked}
         if shape == 'ring':
             outer = labelled_dimension(context, 'outer|outside|od')
@@ -132,9 +163,7 @@ def inspect_order_prompt(prompt, uploads=()):
                 clarify('Ring inner diameter must be smaller than its outer diameter; confirm the supplied dimensions.')
             item.update(outer_diam_mm=outer, inner_diam_mm=inner)
         elif shape == 'circle':
-            if len(dims) != 1:
-                clarify('Specify one diameter for each circle/disc.')
-            item['diameter_mm'] = dims[0]
+            item['diameter_mm'] = circle_diameter(context, match.end(), excluded)
         else:
             required = 3 if shape == 'l_bracket' else 1 if name.startswith('square') else 2
             if len(dims) != required:
@@ -146,7 +175,7 @@ def inspect_order_prompt(prompt, uploads=()):
     for path in uploads or ():
         match = re.search(re.escape(Path(path).name.lower()), text)
         if match is None and len(uploads) == 1:
-            match = re.search(r'\b(?:uploaded|custom)\b', text)
+            match = re.search(r'\b(?:uploaded|custom|this|it)\b', text)
         if match is None:
             continue
         parts.append({'shape_type': 'dxf_file', 'quantity': quantity(text[:match.start()], text[match.end():]),

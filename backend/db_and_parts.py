@@ -371,20 +371,46 @@ class CADPartFactory:
         doc.saveas(dxf_path)
 
     @classmethod
-    def load_part_from_dxf(cls, dxf_path: str) -> Polygon:
+    def load_part_from_dxf(cls, dxf_path: str, import_info: Optional[dict] = None) -> Polygon:
         doc = ezdxf.readfile(dxf_path)
         msp = doc.modelspace()
-        if doc.units not in (0, 4):
-            raise ValueError("ERR_DXF_UNITS: Only millimeter or explicitly unitless-mm files are supported")
+        unit_scales = {0: ("unitless (assumed mm)", 1.0), 1: ("inches", 25.4),
+                       4: ("millimetres", 1.0), 5: ("centimetres", 10.0), 6: ("metres", 1000.0)}
+        if doc.units not in unit_scales:
+            raise ValueError("ERR_DXF_UNITS: Use declared mm, cm, m or inch units; unitless files are interpreted as mm")
+        source_units, scale = unit_scales[doc.units]
         loops: List[Polygon] = []
+        spline_count, vertex_count = 0, 0
         for entity in msp:
-            if entity.dxftype() != "LWPOLYLINE":
-                raise ValueError("ERR_DXF_ENTITY: Only closed straight LWPOLYLINE loops are supported")
-            if not entity.closed or abs(entity.dxf.elevation) > 1e-9 or tuple(entity.dxf.extrusion) != (0.0, 0.0, 1.0):
-                raise ValueError("ERR_DXF_NOT_PLANAR_CLOSED")
-            if any(abs(p[4]) > 1e-12 for p in entity.get_points()):
-                raise ValueError("ERR_DXF_BULGE: Arc bulges are not supported")
-            poly = Polygon([(p[0], p[1]) for p in entity.get_points("xy")])
+            if entity.dxftype() == "LWPOLYLINE":
+                if not entity.closed or abs(entity.dxf.elevation * scale) > 1e-6 or tuple(entity.dxf.extrusion) != (0.0, 0.0, 1.0):
+                    raise ValueError("ERR_DXF_NOT_PLANAR_CLOSED")
+                if any(abs(p[4]) > 1e-12 for p in entity.get_points()):
+                    raise ValueError("ERR_DXF_BULGE: Export arc bulges as closed splines or straight polylines")
+                points = [(p[0] * scale, p[1] * scale) for p in entity.get_points("xy")]
+            elif entity.dxftype() == "SPLINE":
+                controls = [*entity.control_points, *entity.fit_points]
+                if not (entity.closed or entity.dxf.flags & 2) or any(not all(math.isfinite(v) for v in p) or abs(p[2] * scale) > 1e-6 for p in controls):
+                    raise ValueError("ERR_DXF_NOT_PLANAR_CLOSED")
+                vertices = []
+                for point in entity.flattening(distance=0.05 / scale):
+                    if len(vertices) >= 10000:
+                        raise ValueError("ERR_DXF_COMPLEXITY: Simplify this contour before uploading")
+                    vertices.append(point)
+                if not vertices or (vertices[0] - vertices[-1]).magnitude * scale > 1e-6:
+                    raise ValueError("ERR_DXF_NOT_PLANAR_CLOSED")
+                if any(not all(math.isfinite(v) for v in p) or abs(p.z * scale) > 1e-6 for p in vertices):
+                    raise ValueError("ERR_DXF_NOT_PLANAR_CLOSED")
+                points = [(p.x * scale, p.y * scale) for p in vertices]
+                spline_count += 1
+            else:
+                raise ValueError("ERR_DXF_ENTITY: Use closed straight LWPOLYLINE or closed planar SPLINE loops")
+            vertex_count += len(points)
+            if vertex_count > 20000:
+                raise ValueError("ERR_DXF_COMPLEXITY: Limit is 20000 contour vertices")
+            if any(not all(math.isfinite(v) for v in p) for p in points):
+                raise ValueError("ERR_DXF_INVALID_LOOP")
+            poly = Polygon(points)
             if poly.is_empty or not poly.is_valid or poly.area <= 0:
                 raise ValueError("ERR_DXF_INVALID_LOOP")
             loops.append(poly)
@@ -400,4 +426,7 @@ class CADPartFactory:
         poly = Polygon(outer.exterior, [h.exterior for h in holes])
         if not poly.is_valid:
             raise ValueError("ERR_DXF_INVALID_TOPOLOGY")
+        if import_info is not None:
+            import_info.update(source_units=source_units, scale_to_mm=scale,
+                               spline_count=spline_count, curve_tolerance_mm=0.05 if spline_count else 0)
         return cls.normalize_to_origin(poly)

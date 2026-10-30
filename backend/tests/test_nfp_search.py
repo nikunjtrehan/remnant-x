@@ -117,3 +117,27 @@ def test_nfp_finds_exact_fit_missed_by_coarse_grid():
         [sheet], [CADPartSpec("P", "part", part)])
     assert result.total_placed == 1
     assert result.sheet_outcomes[0].placed_parts[0].rotation_deg == 270
+
+
+def test_rotated_perforated_stock_fits_two_parts_in_its_own_frame():
+    from backend.m4_muse_gcode import GCodeCompiler
+    hole = Polygon([(40, 101), (44, 101), (44, 104), (43, 104), (43, 102), (40, 102)])
+    raw = Polygon(box(0, 0, 104, 106).exterior, [hole.exterior])
+    stock = affinity.rotate(raw, 13.5, origin=(0, 0))
+    sheet = RemnantRecord("ROTATED", "steel", 3, stock.area + hole.area, stock.area, 1, stock, "")
+    part = CADPartSpec("P", "plate", box(0, 0, 100, 48), quantity=2)
+    engine = NFPAnnealingNester(kerf_mm=1, iterations=0)
+    result = engine.nest_batch_across_sheets([sheet], [part])
+    assert result.total_placed == 2
+    placed = result.sheet_outcomes[0].placed_parts
+    assert all(abs(p.rotation_deg % 90 - 13.5) < 1e-5 for p in placed)
+    for i, p in enumerate(placed):
+        assert engine.verify_placement_sanitizer(p.polygon, stock, placed[:i], 1)[0]
+    compiled = GCodeCompiler().compile_iso_gcode(sheet.sheet_id, stock, placed)
+    assert compiled.verification.verified_safe
+    assert compiled.verification.hole_collision_length_mm == 0
+    assert compiled.verification.outside_sheet_length_mm == 0
+    part.grain_locked = True
+    locked = engine.nest_batch_across_sheets([sheet], [part])
+    assert locked.total_placed < 2
+    assert all(p.rotation_deg in (0, 180) for s in locked.sheet_outcomes for p in s.placed_parts)

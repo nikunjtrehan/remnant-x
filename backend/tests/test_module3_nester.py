@@ -173,3 +173,22 @@ def test_skip_and_backfill_multi_sheet_spillover():
     # Sheet 2 holds the 5th spilled-over BIG_80 plate
     s2_parts = [p.part_id for p in res.sheet_outcomes[1].placed_parts]
     assert s2_parts == ["BIG_80"]
+
+
+def test_nfp_budget_fallback_keeps_stock_holes_and_clearance(monkeypatch):
+    def over_budget(*args):
+        raise ValueError("ERR_NFP_COMPLEXITY: convex-pair limit is 20000")
+    monkeypatch.setattr("backend.m3_nfp_nester.no_fit_polygon", over_budget)
+    sheet = _make_l_hole_sheet()
+    poly, name = CADPartFactory.make_rectangle(60, 40)
+    nester = HoleAwareNester(kerf_mm=2, fine_step_mm=2)
+    result = nester.nest_batch_across_sheets(
+        [sheet], [CADPartSpec("P", name, poly, quantity=10)])
+    assert result.total_placed == result.total_requested == 10
+    assert result.search_trace["complexity_fallback"] == "bounded_grid"
+    assert result.search_trace["grid_max_positions_per_orientation"] == 10201
+    placed = result.sheet_outcomes[0].placed_parts
+    for index, part in enumerate(placed):
+        assert sheet.polygon.covers(part.polygon)
+        assert part.polygon.distance(sheet.polygon.boundary) >= 2 - 1e-6
+        assert nester.verify_placement_sanitizer(part.polygon, sheet.polygon, placed[:index], 2)[0]

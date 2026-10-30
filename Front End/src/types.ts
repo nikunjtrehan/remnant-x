@@ -172,6 +172,12 @@ export interface ScanFields {
   segmentation_box_px?: number[];
 }
 export interface Upload {
+  import_info?: {
+    source_units: string;
+    scale_to_mm: number;
+    spline_count: number;
+    curve_tolerance_mm: number;
+  };
   filename: string;
   dxf_path: string;
   geometry: Geometry;

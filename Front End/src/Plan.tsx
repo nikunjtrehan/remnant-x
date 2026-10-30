@@ -81,6 +81,28 @@ export function Plan({
     [cutConfirmed, setCutConfirmed] = useState(false),
     [recoveryNote, setRecoveryNote] = useState("");
   const [restoredDraft, setRestoredDraft] = useState(false);
+  const [dxfStockChoice, setDxfStockChoice] = useState("");
+  const [dxfKerf, setDxfKerf] = useState(1);
+  const dxfStocks = Array.from(new Map(inventory.filter(s =>
+    (!settings.selected_sheet_ids || settings.selected_sheet_ids.includes(s.sheet_id)) &&
+    (settings.allow_demo_stock || (!["demo", "local_threshold"].includes(s.inventory_source) && !s.sheet_id.startsWith("DEMO_")))
+  ).map(s => [JSON.stringify([s.material, s.thickness_mm]), s])).entries());
+  const dxfStock = dxfStocks.find(([key]) => key === dxfStockChoice) ??
+    (dxfStocks.length === 1 ? dxfStocks[0] : undefined);
+  useEffect(() => {
+    if (!order) return;
+    setUploads(old => {
+      let changed = false;
+      const next = old.map(upload => {
+        const parts = order.parts.filter(p => p.shape_type === "dxf_file" && p.dxf_path === upload.dxf_path);
+        const quantity = parts.reduce((n, p) => n + p.quantity, 0);
+        if (!parts.length || quantity === upload.quantity) return upload;
+        changed = true;
+        return {...upload, quantity};
+      });
+      return changed ? next : old;
+    });
+  }, [order]);
   const uploadInput = useRef<HTMLInputElement>(null);
   // Example and live states stay separate. Switching modes never seeds inventory or starts inference.
   const shownResult = example ? (sample?.result ?? null) : result;
@@ -113,10 +135,14 @@ export function Plan({
     setOrder(null);
     invalidate();
     try {
-      const parsed = await api.parse(
-        prompt,
-        uploads.map((u) => u.dxf_path),
-      );
+      const files = uploads.map((u) => u.dxf_path);
+      const parsed = uploads.length === 1 && dxfStock
+        ? await api.parse(prompt, files, {
+            material: dxfStock[1].material,
+            thickness_mm: dxfStock[1].thickness_mm,
+            kerf_mm: dxfKerf,
+          })
+        : await api.parse(prompt, files);
       setOrder(parsed.order);
       setTrace(parsed.llm_trace);
     } catch (e) {
@@ -157,9 +183,9 @@ export function Plan({
   const fromUploads = () => {
     editOrder({
       order_id: `DXF_${Date.now().toString(36).toUpperCase()}`,
-      material: order?.material ?? "",
-      thickness_mm: order?.thickness_mm ?? 3,
-      kerf_mm: order?.kerf_mm ?? 1,
+      material: order?.material ?? dxfStock?.[1].material ?? "",
+      thickness_mm: order?.thickness_mm ?? dxfStock?.[1].thickness_mm ?? 3,
+      kerf_mm: order?.kerf_mm ?? dxfKerf,
       parts: uploads.map((u, i) => ({
         part_id: `DXF_${i + 1}`,
         shape_type: "dxf_file",
@@ -198,6 +224,8 @@ export function Plan({
         uploads,
         inputMode,
         planId: id,
+        dxfStockChoice,
+        dxfKerf,
       });
       const planned = commit
         ? await api.confirmPlan(result!.plan_id!)
@@ -255,6 +283,8 @@ export function Plan({
       uploads: (Upload & { quantity: number })[];
       inputMode: "prompt" | "parts";
       planId: string;
+      dxfStockChoice?: string;
+      dxfKerf?: number;
     }>();
     if (
       draft &&
@@ -268,6 +298,8 @@ export function Plan({
       setUploads(draft.uploads);
       setInputMode(draft.inputMode);
       setPlanId(draft.planId || "");
+      setDxfStockChoice(draft.dxfStockChoice || "");
+      setDxfKerf(draft.dxfKerf ?? draft.order?.kerf_mm ?? 1);
       setRecoveryNote(
         "Local job draft restored. Recover a saved plan or review the order before planning.",
       );
@@ -277,10 +309,10 @@ export function Plan({
   useEffect(() => {
     if (!restoredDraft) return;
     if (
-      !saveOrderDraft({ prompt, order, settings, uploads, inputMode, planId })
+      !saveOrderDraft({ prompt, order, settings, uploads, inputMode, planId, dxfStockChoice, dxfKerf })
     )
       setRecoveryNote("Job recovery could not be saved. Keep this page open.");
-  }, [prompt, order, settings, uploads, inputMode, planId, restoredDraft]);
+  }, [prompt, order, settings, uploads, inputMode, planId, dxfStockChoice, dxfKerf, restoredDraft]);
   const inventoryFingerprint = JSON.stringify(
     inventory.map((s) => [
       s.sheet_id,
@@ -471,6 +503,23 @@ export function Plan({
               </div>
               {inputMode === "prompt" && (
                 <>
+                  {uploads.length === 1 && (
+                    <div className="dxf-stock-context">
+                      <label className="field-label" htmlFor="dxf-stock">DXF material and thickness</label>
+                      <select id="dxf-stock" disabled={!!busy} value={dxfStock?.[0] ?? ""}
+                        onChange={e => { setDxfStockChoice(e.target.value); setOrder(null); invalidate(); }}>
+                        {dxfStocks.length !== 1 && <option value="">Choose stock, or specify it in your prompt</option>}
+                        {dxfStocks.map(([key, sheet]) => <option key={key} value={key}>{sheet.material} · {sheet.thickness_mm} mm</option>)}
+                      </select>
+                      <Field label="DXF kerf (mm)">
+                        <input type="number" min="0" max="20" step="0.1" disabled={!!busy} value={dxfKerf}
+                          onChange={e => { setDxfKerf(Number(e.target.value)); setOrder(null); invalidate(); }} />
+                      </Field>
+                      <p className="hint">{dxfStock
+                        ? "This stock supplies material and thickness for your request. The DXF supplies the shape and size."
+                        : "Choose material and thickness for a short request such as “Cut 10 copies of this.”"}</p>
+                    </div>
+                  )}
                   <label className="field-label" htmlFor="manufacturing-prompt">
                     Manufacturing request
                   </label>
@@ -486,13 +535,13 @@ export function Plan({
                     }}
                     placeholder={
                       uploads.length === 1
-                        ? "Make 50 copies of the uploaded DXF from 3 mm ss304 sheet. Kerf 1 mm."
+                        ? "I want to cut 10 copies of this."
                         : "Cut 8 plates, 50 × 30 mm, and 4 discs, diameter 20 mm, from 3 mm steel. Kerf 1 mm."
                     }
                   />
                   <p className="hint">
                     {uploads.length === 1
-                      ? `Attached: ${uploads[0].filename}. Describe the quantity, material and thickness; the DXF supplies the shape.`
+                      ? "Attached: " + uploads[0].filename + ". Enter the number of copies; confirm the stock settings above."
                       : uploads.length > 1
                         ? "DXFs are attached. Use the parts list below to assign each file its own quantity."
                         : "Include quantity, dimensions, thickness and exact material grade."}
@@ -559,6 +608,10 @@ export function Plan({
                     </svg>
                     <div>
                       <strong title={u.filename}>{u.filename}</strong>
+                      {u.import_info && <small>
+                        {u.import_info.source_units} → mm
+                        {u.import_info.spline_count > 0 && (" · curves approximated at " + u.import_info.curve_tolerance_mm + " mm chord tolerance")}
+                      </small>}
                       <small>
                         {u.hole_count} holes ·{" "}
                         {formatNumber(u.geometry.area_mm2 / 100)} cm²
@@ -623,8 +676,8 @@ export function Plan({
                     }
                     onClick={fromUploads}
                   >
-                    Use {uploads.reduce((n, u) => n + u.quantity, 0)} uploaded
-                    parts <ChevronRight size={14} />
+                    Use {uploads.reduce((n, u) => n + u.quantity, 0)} uploaded{" "}
+                    {uploads.reduce((n, u) => n + u.quantity, 0) === 1 ? "part" : "parts"} <ChevronRight size={14} />
                   </button>
                   <button
                     className="text-button upload-prompt-link"
@@ -644,9 +697,9 @@ export function Plan({
                   </button>
                   {uploads.length === 1 && (
                     <p className="hint">
-                      For example: “Make 50 copies of the uploaded DXF from 3 mm
-                      ss304 sheet, kerf 1 mm.” Use the actual material and
-                      thickness of your stock.
+                      Choose the DXF material and thickness above, then say
+                      “I want to cut 10 copies of this.” Review the imported
+                      dimensions and the order before planning.
                     </p>
                   )}
                 </>
@@ -655,9 +708,11 @@ export function Plan({
                 <summary>What DXF files can I use?</summary>
                 <p>
                   One outer boundary with optional disjoint holes. Closed,
-                  straight LWPOLYLINE contours in millimetres, up to 5 MB per
-                  file. Flatten curves to polylines before uploading. Native
-                  circles, arcs, splines, blocks and open contours are rejected.
+                  straight LWPOLYLINE or closed planar SPLINE contours, up to 5 MB
+                  per file. Declared mm, cm, m and inch units convert to mm;
+                  unitless files are treated as mm. Splines use a 0.05 mm chord
+                  tolerance. Native circles, arcs, polyline bulges, blocks and
+                  open contours are rejected. Review the imported size and holes.
                 </p>
               </details>
               {!!uploadErrors.length && (

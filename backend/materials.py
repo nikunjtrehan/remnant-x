@@ -11,6 +11,7 @@ MATERIAL_SYNONYMS = {
     "galvanized": "galvanized_steel", "galvanized steel": "galvanized_steel",
     "aluminum": "aluminum", "aluminium": "aluminum", "alu": "aluminum",
     "acrylic": "acrylic", "plexiglass": "acrylic", "perspex": "acrylic", "pmma": "acrylic",
+    "cardboard": "cardboard",
     "brass": "brass", "copper": "copper", "titanium": "titanium",
     "ss304": "ss304", "ss316": "ss316", "a36": "a36",
     "6061": "al6061", "al6061": "al6061", "5052": "al5052", "al5052": "al5052",
@@ -51,4 +52,4 @@ def explicit_prompt_materials(text: str) -> set[str]:
     if grades:
         return {normalize_material(g) for g in grades}
     return {normalize_material(m.group()) for m in re.finditer(
-        r"\b(?:stainless(?: steel)?|mild steel|carbon steel|galvanized(?: steel)?|aluminum|aluminium|acrylic|brass|copper|titanium)\b", text)}
+        r"\b(?:stainless(?: steel)?|mild steel|carbon steel|galvanized(?: steel)?|aluminum|aluminium|acrylic|brass|copper|titanium|cardboard)\b", text)}

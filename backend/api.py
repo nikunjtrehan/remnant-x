@@ -89,12 +89,16 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
         target = upload_root / (uuid.uuid4().hex + ".dxf")
         try:
             target.write_bytes(data)
-            poly = CADPartFactory.load_part_from_dxf(str(target))
+            import_info = {}
+            poly = CADPartFactory.load_part_from_dxf(str(target), import_info)
+            # Managed uploads are canonical mm polylines; downstream stages use
+            # exactly the reviewed approximation rather than flattening again.
+            CADPartFactory.save_part_to_dxf(poly, str(target))
         except Exception as exc:
             target.unlink(missing_ok=True)
             raise HTTPException(422, "ERR_INVALID_VENDOR_DXF: " + str(exc))
         return {"status": "UPLOADED", "filename": file.filename, "dxf_path": str(target),
-                "geometry": polygon_to_dict(poly), "units": "mm", "hole_count": len(poly.interiors)}
+                "geometry": polygon_to_dict(poly), "units": "mm", "hole_count": len(poly.interiors), "import_info": import_info}
     llm = LiveModelClient()
     app.state.db = db
     app.state.llm = llm
@@ -373,7 +377,11 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
     def parse_natural_language_order(req: NaturalLanguageOrderRequest) -> Dict[str, Any]:
         orch = SparkWarehouseOrchestrator(db, llm_client=llm)
         try:
-            spec = orch.parse_natural_language_order_via_spark(req.prompt, checked_uploads(req.uploaded_dxf_files, upload_root))
+            prompt = req.prompt
+            if req.stock:
+                prompt += (f"\nUse {req.stock.thickness_mm} mm {req.stock.material} sheet. "
+                           f"Kerf {req.stock.kerf_mm} mm.")
+            spec = orch.parse_natural_language_order_via_spark(prompt, checked_uploads(req.uploaded_dxf_files, upload_root))
             check_order_uploads(spec, upload_root)
             return {
                 "status": "PARSED_OK",

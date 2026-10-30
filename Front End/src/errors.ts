@@ -97,7 +97,7 @@ const guidance: Record<string, [string, string]> = {
   ],
   ERR_INVALID_VENDOR_DXF: [
     "This DXF could not be imported",
-    "Use millimetres and supported closed straight LWPOLYLINE boundaries with contained holes. Check the exported CAD file.",
+    "Use closed straight LWPOLYLINE or closed planar SPLINE boundaries with contained holes. Supported units: mm, cm, m or inches. Check the exported CAD file.",
   ],
   ERR_UNMANAGED_DXF: [
     "The uploaded part file is unavailable",

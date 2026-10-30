@@ -132,3 +132,23 @@ new SAM accuracy or live multi-photo cloud throughput.
 
 See [FACTORY_SCENARIOS.md](FACTORY_SCENARIOS.md) for operating scenarios and
 the distinction between automated checks and required visual inspection.
+
+
+### Vendor curves and short copy requests
+
+Upload one DXF, check its millimetre dimensions and hole preview, choose the DXF
+material/thickness (automatically shown when the selected inventory has only one
+stock type), and review kerf. Then enter “I want to cut 10 copies of this.”
+Several material/grade choices require an explicit selection. Prompt/settings
+contradictions stop parsing rather than overriding the request.
+
+Closed planar splines are flattened with a 0.05 mm chord tolerance. Declared
+mm/cm/m/inch units are converted, and managed uploads store the reviewed geometry
+as millimetre polylines. Unitless drawings are treated as millimetres. Open
+contours, blocks, native circles/arcs, polyline bulges and invalid hole topology
+remain unsupported. Files retain their declared size; no automatic fit-to-stock
+resizing occurs.
+
+The cutting plan lists smallest usable remnant first, copies placed on each sheet,
+and copies still needed. Unused later candidates are marked “Not needed.”
+Incomplete batches remain incomplete and cannot be exported as complete jobs.

@@ -151,6 +151,27 @@ export function CuttingPlan({
             </div>
           </div>
         )}
+        {shownResult && (
+          <details className="stock-allocation" open>
+            <summary>Stock order · smallest usable remnant first</summary>
+            {shownResult.nesting.search.complexity_fallback === "bounded_grid" && <p className="hint">
+              A bounded placement search was used for this detailed geometry.
+              Every placement still passes the original geometry checks; more placements may exist.
+            </p>}
+            <ol>
+              {shownResult.candidate_sheets.map((sheet, index) => {
+                const placed = shownResult.nesting.sheet_outcomes.find(s => s.sheet_id === sheet.sheet_id)?.placed_parts.length ?? 0;
+                const before = shownResult.candidate_sheets.slice(0, index).reduce((n, prior) =>
+                  n + (shownResult.nesting.sheet_outcomes.find(s => s.sheet_id === prior.sheet_id)?.placed_parts.length ?? 0), 0);
+                const remaining = Math.max(0, shownResult.nesting.total_requested - before - placed);
+                return <li key={sheet.sheet_id}><strong>{sheet.sheet_id}</strong>
+                  {" · "}{formatNumber(sheet.usable_area_mm2 / 100)} cm² usable ·{" "}
+                  {before >= shownResult.nesting.total_requested ? "Not needed" : placed + " placed · " + remaining + " still needed"}
+                </li>;
+              })}
+            </ol>
+          </details>
+        )}
         {!!outcomes.length && (
           <div
             className="sheet-tabs"

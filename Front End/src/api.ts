@@ -74,10 +74,10 @@ export const api = {
       save_to_warehouse: false,
       segmentation_mode: "sam",
     }),
-  parse: (prompt: string, uploads: string[]) =>
+  parse: (prompt: string, uploads: string[], stock?: Pick<Order, "material" | "thickness_mm" | "kerf_mm">) =>
     request<{ order: Order; llm_trace: Record<string, unknown> }>(
       "parse-order",
-      { prompt, uploaded_dxf_files: uploads },
+      { prompt, uploaded_dxf_files: uploads, stock },
     ),
   upload: (file: File) => {
     const form = new FormData();

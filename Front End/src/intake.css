@@ -444,3 +444,9 @@
 .batch-stock-selection .checkbox-label {
   margin: 0.6rem 0;
 }
+
+.dxf-stock-context { display: grid; gap: 10px; margin-bottom: 16px; }
+.stock-allocation { margin: 16px 0; padding: 14px 16px; background: var(--surface-soft, #f6f8f1); border-radius: 8px; }
+.stock-allocation summary { cursor: pointer; font-weight: 600; }
+.stock-allocation ol { padding-left: 22px; margin-bottom: 0; }
+.stock-allocation li { margin: 8px 0; font-size: 13px; }

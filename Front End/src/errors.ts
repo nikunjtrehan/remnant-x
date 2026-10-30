@@ -16,8 +16,8 @@ const guidance: Record<string, [string, string]> = {
     "Keep exactly one marker of each ID 0–3 on the station. Remove spare marker sheets from view.",
   ],
   ERR_CALIBRATION_DRIFT: [
-    "Station calibration needs attention",
-    "Check the selected station, spans between black-square edges and printed black-square size. Keep the camera facing the station.",
+    "This photo could not be calibrated",
+    "Retake an overhead photo with all marker squares and white borders clear. If the problem remains, check the selected station, spans and printed marker size.",
   ],
   ERR_INVALID_HOMOGRAPHY: [
     "The station cannot be calibrated",
@@ -28,8 +28,8 @@ const guidance: Record<string, [string, string]> = {
     "Choose a readable JPEG or PNG. Re-export a damaged image and try again.",
   ],
   ERR_MULTIPLE_SHEETS: [
-    "Photograph one remnant at a time",
-    "Separate the sheets and capture each one with all four station markers. Overlapping sheets can hide edges.",
+    "Could not trace one complete remnant",
+    "Photograph one whole remnant inside the calibrated station. Separate overlapping sheets; if an edge leaves the station, move it inside and retake the photo. Review any stray detected fragments.",
   ],
   ERR_SAM_OBJECT_SELECTION: [
     "Choose one sheet",

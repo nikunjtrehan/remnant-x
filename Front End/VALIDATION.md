@@ -44,6 +44,21 @@ Browser testing exposed a development StrictMode hydration bug. Persistence now
 waits for the restored state to commit; a regression runs the same remount
 behaviour. No empty draft overwrites the stored job.
 
+## Separate live physical API exercise
+
+The [two-piece report](../docs/architecture/PHYSICAL_VALIDATION_20261030.md)
+records eight actual station photographs: five successful real SAM contours,
+two calibration rejections before SAM and one clipped-mask topology rejection.
+The unmodified contours produced a real Baseten-parsed 50-copy DXF job and a
+complete nine-part job across both sheets, with final software verification.
+These were isolated API checks, not a second browser exercise. Physical source
+photos remain private. Corrected references were supplied after results; exterior
+errors reach 7.32 mm and one supplied offset remains inconsistent.
+
+The live captures also prompted clearer recapture guidance for calibration
+failure and disconnected contours, including a single sheet cropped by the
+station boundary. Geometry thresholds and model output were not changed.
+
 ## Earlier milestone evidence retained
 
 The preceding frontend milestones exercised 101 distinct uploaded DXFs, a

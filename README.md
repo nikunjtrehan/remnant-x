@@ -36,6 +36,11 @@ distinguish automatic guards from operator checks.
 The [review and recovery decisions](docs/architecture/FACTORY_REVIEW.md) explain
 the visual acceptance step, exact-plan receipts and local recovery design.
 
+The [two-piece physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md)
+records real SAM results from eight captures, blocked photos, measured errors
+and verified DXF/multi-sheet jobs. These are cardboard prototype results;
+uniform millimetre accuracy and real-machine cutting are not established.
+
 Read `backend/api.py` for HTTP routes and `backend/pipeline.py` for the manufacturing workflow. Public request types live in `schemas.py`; geometry/result conversion lives in `serialization.py`. The numbered modules retain the optical, order, nesting and G-code stages. The implemented classes are `HoleAwareNester` (NFP contact placement plus bounded simulated annealing) and `GCodeCompiler`; old Python names remain compatibility aliases. Baseten is the default order parser; Fireworks supplies transport failover and one guarded repair of a rejected complete-order extraction. Independent local nesting searches run in parallel; no three-cloud blackboard sits in the execution path.
 
 The [application promise audit](docs/architecture/APPLICATION_PROMISE_AUDIT.md) records the recovered application wording, implementation evidence and outstanding commitments. The backend now includes parallel NFP/annealing search, real Muse Code-prepared emitters and optional checked arc lead-ins. The [repository audit](docs/architecture/REPOSITORY_AUDIT.md) explains the winner-source review, simplifications and remaining limits. The [physical validation protocol](docs/architecture/PHYSICAL_VALIDATION.md) separates routine photo indexing from independent ruler measurements used only for testing.

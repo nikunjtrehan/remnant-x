@@ -2,7 +2,13 @@
 
 Decision date: 29 October 2026.
 
-Status: First photo and specimen measurements received on 29 October 2026.
+Status: Two cardboard specimens tested across eight new captures on 30 October
+2026. The [two-piece report](PHYSICAL_VALIDATION_20261030.md) records five correct
+topologies, three blocked captures, exterior errors up to 7.32 mm, a conflicting
+reference offset and verified downstream jobs. No uniform physical accuracy
+acceptance has been established.
+
+First photo and specimen measurements received on 29 October 2026.
 Initial image-space SAM diagnostics are recorded in the [first-capture report](PHYSICAL_VALIDATION_20261029.md).
 Marker spans and square size were subsequently confirmed. The actual calibrated
 endpoint accepts the image with one sheet and one L-shaped hole. Physical

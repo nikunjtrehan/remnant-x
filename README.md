@@ -17,7 +17,8 @@ recorded, software-verified backend output. It is separate from live SAM process
 [Try the example](#try-the-example-no-api-keys) ·
 [Run the live workflow](#run-the-live-workflow) ·
 [Measured physical tests](docs/architecture/PHYSICAL_VALIDATION_20261030.md) ·
-[Architecture decisions](docs/architecture/REPOSITORY_AUDIT.md)
+[Architecture](ARCHITECTURE.md) ·
+[Engineering decisions](https://nikunjtrehan.github.io/remnant-x/engineering-decisions/)
 
 ## The workflow
 
@@ -92,30 +93,28 @@ See the [workflow guide](Front%20End/WORKFLOW_GUIDE.md) for review/recovery beha
 and the [engineering reference](docs/ENGINEERING_GUIDE.md) for API contracts,
 supported geometry and equivalent startup commands.
 
-## Where AI fits
+## Architecture
 
 ```mermaid
 flowchart LR
     Photo["Station photo"] --> Calibration["ArUco calibration"]
     Calibration --> SAM["Meta SAM 3.1"]
-    SAM --> Review["Visual review + inventory"]
+    SAM --> Review["Review + inventory"]
     Request["Prompt / vendor DXF"] --> Order["Interpret + validate order"]
-    Review --> Nest["Deterministic nesting"]
+    Review --> Nest["Hole-aware nesting"]
     Order --> Nest
-    Nest --> Output["Compile + verify final program"]
+    Nest --> Output["Compile + verify G-code"]
 ```
 
-| Component | Responsibility |
-| --- | --- |
-| Meta SAM 3.1 | Segment the calibrated photograph into material and empty space |
-| Baseten Muse Spark Open | Default natural-language order extraction |
-| Fireworks Muse Spark Open | Transport failover and one guarded repair of a rejected complete extraction |
-| Muse Code | Offline preparation of the checked-in GRBL/LinuxCNC emitters |
-| Local Python / GEOS / SQLite | Validate requirements, match exact grades, nest, verify output and transact inventory |
+React and TypeScript provide the desktop workbench; one FastAPI service owns
+perception, order interpretation, geometry and the SQLite warehouse. Muse Spark
+Open interprets orders through Baseten, with configured failover and guarded
+Fireworks repair. Muse Code-prepared controller emitters are reused outside the
+coding-agent loop. The worker reviews geometry and confirms the exact saved plan
+after physical cutting.
 
-Models do not invent missing dimensions or authorize manufacturing. Independent
-local nesting searches can run in parallel; duplicate cloud interpretation is not
-mandatory. [The benchmark explains that routing decision.](docs/architecture/DECISION.md)
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system topology, repository layout,
+workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
@@ -155,8 +154,4 @@ From `Front End`: `npm run check`. Tests use offline providers; live smoke tests
 are separate and opt-in. The [Checks workflow](.github/workflows/checks.yml)
 runs these checks on push and pull requests. [View hosted results.](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
 
-[README and hosting research](docs/REPOSITORY_PRESENTATION_RESEARCH.md) records
-the inspected winner repositories and the source of each recommendation.
-Maintainer: [nikunjtrehan](https://github.com/nikunjtrehan).
-
-To view architectural decisions, visit [the engineering decisions website](https://nikunjtrehan.github.io/remnant-x/architecture/).
+To view engineering decisions, visit [the engineering decisions website](https://nikunjtrehan.github.io/remnant-x/engineering-decisions/).

@@ -154,4 +154,4 @@ From Front End:
 
 The backend suite uses offline providers. Live SAM smoke tests and provider benchmarks are separate, opt-in operations. Never publish .env, databases, raw local photos, artifacts, node_modules, .venv or private handoff notes.
 
-Architectural decisions: https://nikunjtrehan.github.io/remnant-x/architecture/
+Architectural decisions: https://nikunjtrehan.github.io/remnant-x/engineering-decisions/

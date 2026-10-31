@@ -362,7 +362,7 @@ The hot/cold-path inspiration was discussed as a pattern borrowed from Recover A
 
 **Front End/tsconfig files** define TypeScript compilation. **Front End/index.html** is the browser entry. **Front End/public/example** contains labeled synthetic example inputs and backend outputs.
 
-**.gitignore** excludes secrets, environments, databases, raw local artifacts, node_modules, generated builds and private handoffs. **.gitattributes** controls text/binary handling. **LICENSE** states the repository license; external uploaded artwork retains its own rights.
+**.gitignore** excludes secrets, environments, databases, raw local artifacts, node_modules, generated builds and private handoffs. **.gitattributes** controls text/binary handling. External uploaded artwork retains its own rights. The repository does not currently include a LICENSE file.
 
 ## Scripts and benchmarks
 
@@ -430,7 +430,7 @@ A production build checks TypeScript and bundles the application. Passing tests 
 
 **Front End/WORKFLOW_GUIDE.md** covers worker recovery and review. VALIDATION.md, FACTORY_SCENARIOS.md and MILESTONES.md record frontend evidence, scenarios and development stages. Repository presentation research is recorded under docs. **docs/FINAL_READINESS.md** preserves a dated integration review.
 
-**docs/architecture/index.html** is the static decision site. DECISION.md and benchmark JSON record routing policy. FACTORY_REVIEW.md explains approval and confirmation boundaries. ROTATED_STOCK_NESTING.md records the rotation fix. Physical-validation reports preserve two cardboard experiments and ground-truth corrections. Application-promise/repository audits retain their original dates and scope. Public fixtures/assets are separate from private customer uploads.
+**docs/engineering-decisions/index.html** is the static decision site. The former docs/architecture/index.html entry redirects to it. DECISION.md and benchmark JSON record routing policy. FACTORY_REVIEW.md explains approval and confirmation boundaries. ROTATED_STOCK_NESTING.md records the rotation fix. Physical-validation reports preserve two cardboard experiments and ground-truth corrections. Application-promise/repository audits retain their original dates and scope. Public fixtures/assets are separate from private customer uploads.
 
 **docs/REPOSITORY_PRESENTATION_RESEARCH.md** records inspected winner repositories and the evidence behind presentation recommendations. **.github/workflows/checks.yml** runs offline backend tests and frontend checks. **.github/workflows/pages.yml** publishes checked-in documentation. The static site does not host FastAPI or expose local keys/databases.
 
@@ -452,6 +452,6 @@ Preserve exact grade matching, geometry approval, request binding, stale-state c
 
 Run backend tests from the root and npm run check from Front End. Keep physical experiments and opt-in network benchmarks outside offline CI. Use reviewable commits and protect .env, databases, photos and artifacts before publishing.
 
-Architectural decisions: https://nikunjtrehan.github.io/remnant-x/architecture/
+Architectural decisions: https://nikunjtrehan.github.io/remnant-x/engineering-decisions/
 
 Repository: https://github.com/nikunjtrehan/remnant-x

@@ -119,7 +119,7 @@ mandatory. [The benchmark explains that routing decision.](docs/architecture/DEC
 
 ## Evidence and limits
 
-Latest local checks, **30 October 2026**: **184 backend tests**, **42 frontend tests**,
+Latest local checks, **31 October 2026**: **211 backend tests**, **49 frontend tests**,
 TypeScript checks and a successful production build.
 
 - [Physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md): two cardboard
@@ -136,7 +136,7 @@ TypeScript checks and a successful production build.
 This is a supervised local prototype. Metal/glare performance and real-machine
 cutting are unqualified. Output uses centerline contours without dimensional
 kerf compensation. Supported profiles are `ISO_6983_GRBL` and `LINUXCNC_LASER`;
-vendor DXFs accept a bounded straight-polyline subset.
+vendor DXFs accept closed straight polylines and closed planar splines, with declared mm/cm/m/inch units converted to mm. Spline import uses a disclosed 0.05 mm chord tolerance; arbitrary CAD is not supported.
 See the [engineering reference](docs/ENGINEERING_GUIDE.md) for precise limits.
 
 ## Repository and checks
@@ -147,6 +147,7 @@ See the [engineering reference](docs/ENGINEERING_GUIDE.md) for precise limits.
 | [backend/api.py](backend/api.py) → [pipeline.py](backend/pipeline.py) | HTTP boundary and manufacturing workflow |
 | [backend/tests](backend/tests) | Offline geometry, model-contract, verification and transaction regressions |
 | [docs/architecture](docs/architecture) | Decisions, physical experiments and application-promise audit |
+| [Local startup](docs/LOCAL_STARTUP.md), [codebase guide](docs/CODEBASE_GUIDE.md) | Two-terminal setup and a detailed architecture/file reference |
 | [benchmarks](benchmarks/README.md), [scripts](scripts) | Evaluation cases, explicit demo startup and opt-in live tools |
 
 From the root: `.\.venv\Scripts\python.exe -m pytest -q`.
@@ -157,3 +158,5 @@ runs these checks on push and pull requests. [View hosted results.](https://gith
 [README and hosting research](docs/REPOSITORY_PRESENTATION_RESEARCH.md) records
 the inspected winner repositories and the source of each recommendation.
 Maintainer: [nikunjtrehan](https://github.com/nikunjtrehan).
+
+To view architectural decisions, visit [the engineering decisions website](https://nikunjtrehan.github.io/remnant-x/architecture/).

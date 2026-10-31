@@ -53,7 +53,9 @@ The returned `verified_safe` means the emitted command subset and planned center
 
 An uploaded DXF can also be bound directly using a structured part: `{"part_id":"VENDOR", "shape_type":"dxf_file", "quantity":50, "dxf_path":"<returned path>"}`. For multiple uploads, use explicit paths in a structured order. API paths must stay inside the managed upload directory. Uploads are limited to 5 MB and stored under generated names.
 
-**Accepted DXF contract:** one planar outer boundary plus zero or more disjoint holes, represented by closed, straight `LWPOLYLINE` entities. `$INSUNITS=4` means millimeters; unitless files are explicitly interpreted as millimeters. Circles, arcs, bulges, open loops, blocks, text, splines, other units, tilted/extruded contours, multiple outer boundaries and nested/overlapping holes are rejected. Export curves as sufficiently fine straight polylines in your CAD tool. Exports produced by this application explicitly declare millimeters.
+**Accepted DXF contract:** one planar outer boundary plus zero or more disjoint holes, represented by closed straight LWPOLYLINE or closed planar SPLINE entities. Declared millimetres, centimetres, metres and inches convert to millimetres; unitless files are interpreted as millimetres. Splines are adaptively flattened with a 0.05 mm chord tolerance and must close geometrically. Imports with open/nonplanar contours, native circles/arcs, polyline bulges, blocks, text, unsupported units, multiple outer boundaries or nested/overlapping holes are rejected. A managed upload is rewritten as the exact reviewed millimetre polylines so nesting and verification use the same geometry. The preview reports the source units, converted dimensions, holes and spline approximation. This approximation tolerance is not a machine accuracy certification.
+
+A single uploaded file supports “I want to cut 10 copies of this.” The UI supplies a visible material/thickness choice from the selected accepted inventory and an editable kerf. Multiple grades require a choice; no grade is substituted. The parse endpoint accepts these settings as an optional structured stock object. Conflicting prompt/settings are rejected. Without stock context, material and thickness must still be stated in the prompt. Results list candidate stock in smallest-usable-area order with placed and remaining quantities; nesting is heuristic and does not prove a global optimum.
 
 ## Real SAM and the ArUco station
 
@@ -129,3 +131,12 @@ The test suite disables cloud credentials inside the test process. It includes g
 Current regression and browser evidence: [frontend validation](../Front%20End/VALIDATION.md) and [final integration review](FINAL_READINESS.md). Physical measurements: [two-piece report](architecture/PHYSICAL_VALIDATION_20261030.md).
 
 Primary protocol references: [Meta segmentation](https://dev.meta.ai/docs/sam/segmenting), [mask grammar](https://dev.meta.ai/docs/sam/reading-segmentation), [official parser](https://dev.meta.ai/docs/sam/client-libraries), [GRBL supported modes](https://github.com/gnea/grbl/wiki), [GRBL laser mode](https://github.com/gnea/grbl/blob/master/doc/markdown/laser_mode.md).
+
+
+For detailed CAD against jagged scanned stock, NFP decomposition may exceed its
+fixed computation budget. The nester then proposes a bounded grid of at most
+10,201 positions per orientation against the unchanged geometry. Coverage,
+hole clearance, part clearance, the independent sanitizer and final G-code
+verification still apply. The search trace and UI disclose this fallback.
+A sampled search may miss legal placements; it does not prove insufficient
+physical space or a globally optimal packing.

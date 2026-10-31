@@ -48,7 +48,6 @@ flowchart TB
     API --> Review
     Review <--> DB
     Nest --> DB
-    Gcode --> Files
     API <--> Files
 ```
 
@@ -746,7 +745,7 @@ stateDiagram-v2
     Added --> [*]
 ```
 
-The backend review record uses accepted=0 for pending, accepted=1 for accepted and accepted=-1 for rejected. Repeated acceptance is replay-safe. A rejected review cannot later be accepted; a new analysis requires a new review identity.
+The backend review record uses accepted=0 for pending, accepted=1 for accepted and accepted=-1 for rejected. Repeated acceptance is replay-safe. A rejected review cannot later be accepted; a new analysis requires a new review identity. The UI does not keep a separate rejected queue status: when it recovers a rejected server review, it returns the local photo to an unchecked/replacement state with an explanation. Rejected in the state diagram denotes the persisted backend review state.
 
 ### 11.2 Plan states
 

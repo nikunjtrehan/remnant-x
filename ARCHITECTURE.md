@@ -181,7 +181,7 @@ The model extracts the requested job. It does not choose physical stock by inven
       -> file path bound to the requested part and quantity
       -> CADPartSpec
 
-The managed importer accepts one outer boundary with disjoint holes, represented by closed straight LWPOLYLINE or closed planar SPLINE loops. Declared mm/cm/m/inch units are converted to millimetres; unitless files are treated as mm. Splines are flattened using a disclosed chord tolerance. Uploads are limited to 5 MB. Native circles/arcs, bulges, blocks, open or 3D geometry, and invalid hole topology are outside the supported import contract.
+The managed importer accepts one outer boundary with disjoint holes, represented by closed straight LWPOLYLINE or closed planar SPLINE loops. Declared mm/cm/m/inch units are converted to millimetres; unitless files are treated as mm. Splines are adaptively flattened with a 0.05 mm chord tolerance and must close geometrically. Uploads are limited to 5 MB. Native circles/arcs, bulges, blocks, open or 3D geometry, and invalid hole topology are outside the supported import contract.
 
 An uploaded DXF defines a requested part; it is not a sheet of warehouse stock. Managed upload paths are checked before downstream use and are constrained to the configured upload directory.
 
@@ -310,7 +310,7 @@ FastAPI publishes the request/response schema at /docs while the local service i
 
 | Type / record | Meaning |
 | --- | --- |
-| StationCalibrationConfig | Measured station width, height and marker size |
+| StationImageRequest / IndexImageRequest | Image payload, measured station width/height, marker size and stock metadata |
 | RemnantRecord | Physical stock identity, material, thickness, polygon, source and location |
 | ManufacturingOrderSpec | Validated material, thickness, kerf and requested quantities |
 | CADPartSpec | Part geometry, interior holes, quantity and grain restriction |
@@ -319,6 +319,7 @@ FastAPI publishes the request/response schema at /docs while the local service i
 | BatchNestingResult | Multi-sheet result, requested/placed counts and search trace |
 | CompiledSheetGCode | Final program, work origin, ordered loops and verification result |
 | Intake review | Persisted analysis awaiting a worker geometry decision |
+| FullPipelineRequest | Complete pipeline request, stock selection, search bounds, controller profile and process settings |
 | Verified plan | Complete result and programs bound to a request and stock snapshots |
 
 Shapely polygons represent the sheet exterior and its interior holes. SQLite stores stock polygon geometry as WKT; the serialization layer converts it into coordinate arrays for the browser. Image coordinates use X-right/Y-down; physical geometry uses millimetres with X-right/Y-up. The compiler records the work-origin translation used for each emitted program.

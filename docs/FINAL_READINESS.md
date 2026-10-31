@@ -3,7 +3,12 @@
 30 October 2026. Scope: the local desktop prototype, repository presentation and
 publication. Public app hosting and physical machine operation are separate.
 
-## Current checks
+This is a historical report from 30 October. For the newer **211 backend / 49
+frontend** test baseline and its exact hosted CI run, see the
+[current validation summary](VALIDATION_STATUS.md). The original observations
+below are preserved unchanged.
+
+## Checks recorded on 30 October 2026
 
 | Check | Result |
 | --- | --- |

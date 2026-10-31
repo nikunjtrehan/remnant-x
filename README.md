@@ -14,10 +14,19 @@ keeping their existing holes, and planning new parts across compatible inventory
 It combines Meta SAM 3.1 perception with model-assisted order interpretation and
 deterministic geometry.
 
-![Remnant X workbench showing a recorded 28-part cutting plan](docs/assets/workbench-example.png)
+## Demonstrated on real remnants
 
-*Actual application screenshot. The key-free example uses a synthetic station and
-recorded, software-verified backend output. It is separate from live SAM processing.*
+Two photographed cardboard remnants, one uploaded vendor part, three requested
+copies: **one on Piece B and two on Piece A**. Both final G-code programs passed
+software verification, with zero reported cutting path across existing stock
+holes or outside the supplied sheet geometry. Inventory was unchanged during
+this validation. [Read the three-copy experiment.](docs/architecture/ROTATED_STOCK_NESTING.md)
+
+![Actual SAM 3.1 contour of physical Piece B, including its notch and two holes, compared with corrected ruler measurements](docs/architecture/assets/piece-b-contour-20261030.png)
+
+*Real SAM contour from the 30 October physical-validation experiment. The later
+three-copy nesting experiment is documented separately above. Cardboard tests
+support this demonstration; they do not qualify metal cutting or machine accuracy.*
 
 [Try the example](#try-the-example-no-api-keys) ·
 [Run the live workflow](#run-the-live-workflow) ·
@@ -45,6 +54,11 @@ Workers do not enter measurements of existing holes. Ruler measurements in our
 validation reports are independent test references, never model inputs.
 
 ## Try the example (no API keys)
+
+![Remnant X workbench showing the recorded synthetic 28-part example](docs/assets/workbench-example.png)
+
+*Recorded, software-verified backend output on a synthetic station. This key-free
+example is separate from the physical-photo experiments and live SAM processing.*
 
 Requires Node.js 22.12 or newer and npm.
 
@@ -174,14 +188,16 @@ workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
-Latest local checks, **31 October 2026**: **211 backend tests**, **49 frontend tests**,
-TypeScript checks and a successful production build.
+Latest verified hosted checks, **31 October 2026**: **211 backend tests**,
+**49 frontend tests**, TypeScript checks and a successful production build.
+[Current validation summary](docs/VALIDATION_STATUS.md) links the exact CI run
+and distinguishes these totals from the older 184/42 results.
 
 - [Physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md): two cardboard
   specimens, eight photos, five correct usable topologies and three blocked
   captures. Exterior error reached **7.32 mm**; this is not uniform millimetre
   accuracy. Corrected ruler references were supplied after results.
-- [Final integration review](docs/FINAL_READINESS.md): real photo ZIP intake,
+- [Historical integration review, 30 October](docs/FINAL_READINESS.md): real photo ZIP intake,
   SAM reviews, explicit stock acceptance, a live 50-copy DXF order, saved-plan
   recovery and verified download.
 - [Frontend validation](Front%20End/VALIDATION.md) and

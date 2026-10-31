@@ -838,17 +838,27 @@ The postprocessor does not execute user-supplied Python, and DXF paths are confi
 
 ### 13.1 Automated checks recorded in the repository
 
-The final integration review dated 30 October 2026 records:
+The current verified hosted baseline is **211 backend tests and 49 frontend tests**,
+plus TypeScript checks and a successful production build. These counts come from
+[CI run 41216278990](https://github.com/nikunjtrehan/remnant-x/actions/runs/41216278990)
+on 31 October 2026 at source revision `1e1efbe`. See the
+[current validation summary](docs/VALIDATION_STATUS.md) for the evidence and scope.
 
-| Check | Recorded result | Evidence |
+| Check | Current recorded result | Evidence |
 |---|---:|---|
-| Offline backend suite | 184 passed | [Final readiness report](docs/FINAL_READINESS.md) |
-| Frontend unit/interaction tests | 42 passed across 11 files | [Frontend validation](Front%20End/VALIDATION.md) |
-| TypeScript and Vite production build | Passed | [Final readiness report](docs/FINAL_READINESS.md) |
-| GitHub Actions Windows CI | Passed backend tests, frontend tests and production build | [Checks workflow](.github/workflows/checks.yml) and run link in final readiness report |
-| npm dependency audit | Zero reported vulnerabilities at the recorded audit | [Final readiness report](docs/FINAL_READINESS.md) |
+| Offline backend suite | 211 passed; one deprecation warning | Hosted CI run linked above |
+| Frontend unit/interaction tests | 49 passed across 11 files | Same hosted CI run |
+| TypeScript and Vite production build | Passed | Same hosted CI run |
+| GitHub Actions environment | Windows, Python 3.11 and Node 22 | [Checks workflow](.github/workflows/checks.yml) |
 
-These figures are recorded evidence from 30 October, not a test run performed while editing this document. The CI workflow installs Python 3.11 and Node 22 on Windows and executes the offline backend suite plus npm run check. Cloud-provider and live SAM operations are separate opt-in checks, not silently performed by the regression suite.
+**Historical baseline:** the [30 October integration report](docs/FINAL_READINESS.md)
+records 184 backend tests, 42 frontend tests and a zero-vulnerability dependency
+audit at that time. Those dated observations are retained as history; they are
+not the current test totals or a newly performed dependency audit.
+
+The figures above were verified from existing CI logs, not a fresh test run made
+while editing this document. Cloud-provider and live SAM operations remain
+separate opt-in checks, outside the offline regression suite.
 
 ### 13.2 What the tests exercise
 
@@ -870,6 +880,13 @@ The frontend suite covers intake, UI behavior, IndexedDB file recovery, review r
 docs/FINAL_READINESS.md records an actual browser-to-backend exercise using two physical cardboard pieces photographed in the measured station. A covered-marker image was blocked, real Meta SAM 3.1 geometry was reviewed and accepted, a vendor DXF was uploaded, a Baseten Muse Spark Open request interpreted a 50-copy order, the 50-part plan passed software verification and its saved result was recovered after refresh/API restart. A separate nine-part job was planned across both sheets with both programs verified. Preview and download did not consume stock; no completion receipt was recorded during that exercise.
 
 The physical validation report contains the source measurements and limitations. It reports exterior dimension errors reaching 7.32 mm; the experiment covers a small cardboard sample and does not establish repeatability or general dimensional acceptance. The reported UI/API integration scenarios are evidence of workflow execution, not evidence of metal cutting or industrial qualification.
+
+The [31 October rotated-stock experiment](docs/architecture/ROTATED_STOCK_NESTING.md)
+then checked the accepted photo-derived stock with the original-size decorative
+vendor DXF: all three requested copies placed, one on Piece B and two on Piece A.
+Both final programs passed verification, with zero reported stock-hole crossing
+and outside-sheet cutting path. This was an in-memory software validation and did
+not update inventory or operate a machine.
 
 ### 13.4 Explicit non-claims
 

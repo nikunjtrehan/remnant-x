@@ -362,7 +362,7 @@ The hot/cold-path inspiration was discussed as a pattern borrowed from Recover A
 
 **Front End/tsconfig files** define TypeScript compilation. **Front End/index.html** is the browser entry. **Front End/public/example** contains labeled synthetic example inputs and backend outputs.
 
-**.gitignore** excludes secrets, environments, databases, raw local artifacts, node_modules, generated builds and private handoffs. **.gitattributes** controls text/binary handling. External uploaded artwork retains its own rights. The repository does not currently include a LICENSE file.
+**.gitignore** excludes secrets, environments, databases, raw local artifacts, node_modules, generated builds and private handoffs. **.gitattributes** controls text/binary handling. External uploaded artwork retains its own rights. The original project code is distributed under the [MIT license](../LICENSE); third-party dependencies and uploaded artwork retain their own license terms.
 
 ## Scripts and benchmarks
 

@@ -47,7 +47,7 @@ flowchart TB
     Photo --> Review
     API --> Review
     Review <--> DB
-    Nest --> DB
+    Order --> DB
     API <--> Files
 ```
 

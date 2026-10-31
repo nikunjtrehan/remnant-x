@@ -61,6 +61,37 @@ existing cutout, planned paths and verified output. The backend is not required
 for this example. A localhost address works only while its server is running
 on your computer; it is not a hosted demo.
 
+## Physical capture station (required for live workflow)
+
+The key-free Example does not need hardware. Live photo indexing requires a
+simple, measured capture station:
+
+1. **Prepare a flat work surface.** Keep one physical remnant flat and entirely
+   inside the station area. Use one photograph per distinct remnant.
+2. **Fit the four ArUco markers.** Remnant X expects OpenCV
+   `DICT_4X4_50` markers with IDs `0`, `1`, `2` and `3`, placed at the
+   top-left, top-right, bottom-right and bottom-left corners respectively.
+   Keep all four visible exactly once, including their white quiet-zone borders.
+   Do not cover or move them after measuring the station.
+3. **Measure the station.** Enter the actual top, bottom, left and right spans,
+   plus the size of the marker's **black square core**. Exclude the white border
+   when measuring the marker. The example values in the app are specific to one
+   station, not universal dimensions; measure your own setup.
+4. **Use a contrasting background.** A matte background that contrasts with the
+   remnant makes its boundary easier to inspect. Black chart paper is a useful
+   option for light cardboard; use a different contrasting colour for dark
+   material. Black paper is a recommendation, not a software requirement.
+5. **Check before segmentation.** Photograph the complete remnant with every
+   marker unobstructed, then run the marker/calibration check before requesting
+   SAM outlines. Inspect the returned boundary and holes before accepting the
+   geometry into inventory.
+
+For the full capture walkthrough and calibration notes, see the
+[local startup guide](docs/LOCAL_STARTUP.md) and
+[physical validation report](docs/architecture/PHYSICAL_VALIDATION_20261030.md).
+This is a photo-capture procedure, not a machine-operation or cutting-process
+qualification.
+
 ## Run the live workflow
 
 Requires Python 3.11, the frontend above, a calibrated four-marker station,

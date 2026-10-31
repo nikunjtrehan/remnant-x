@@ -1,6 +1,11 @@
 # Remnant X
 
 [![Checks](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.162.0-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
 **Turn the offcut you have into a cutting plan for the parts you need.**
 
@@ -93,6 +98,14 @@ See the [workflow guide](Front%20End/WORKFLOW_GUIDE.md) for review/recovery beha
 and the [engineering reference](docs/ENGINEERING_GUIDE.md) for API contracts,
 supported geometry and equivalent startup commands.
 
+## Core capabilities
+
+- **Photo-derived inventory geometry:** ArUco calibration and Meta SAM 3.1 produce candidate remnant outlines and holes. Workers review the geometry and supply the physical stock ID, material grade and thickness.
+- **Flexible order intake:** describe a job in natural language or import supported vendor DXFs. Extracted requirements are checked before planning.
+- **Hole-aware, multi-sheet nesting:** place parts across compatible remnants while accounting for sheet boundaries and existing cutouts. Search is bounded and heuristic; the planner reports any parts it could not place.
+- **Verified controller programs:** compile and independently check output for the `ISO_6983_GRBL` and `LINUXCNC_LASER` profiles before download. Remnant X does not connect to or control a cutting machine.
+- **Operator-gated inventory updates:** saved plans retain stock snapshots, stale plans are blocked, and affected inventory updates atomically only after the operator reports that the exact reviewed cut has completed.
+
 ## Architecture
 
 ```mermaid
@@ -106,12 +119,24 @@ flowchart LR
     Nest --> Output["Compile + verify G-code"]
 ```
 
-React and TypeScript provide the desktop workbench; one FastAPI service owns
-perception, order interpretation, geometry and the SQLite warehouse. Muse Spark
-Open interprets orders through Baseten, with configured failover and guarded
-Fireworks repair. Muse Code-prepared controller emitters are reused outside the
-coding-agent loop. The worker reviews geometry and confirms the exact saved plan
-after physical cutting.
+React and TypeScript provide the workbench; one FastAPI service owns
+perception, order interpretation, geometry and the SQLite warehouse.
+
+### AI and deterministic responsibilities
+
+Remnant X uses AI where perception or interpretation is useful, while local,
+testable code remains responsible for manufacturing geometry and final checks.
+
+| Component | Responsibility | Boundary |
+| --- | --- | --- |
+| **Meta SAM 3.1** | Segments the photographed remnant. | Produces a candidate mask; a worker reviews its outline and holes and supplies material identity and thickness. |
+| **Muse Spark Open** | Interprets natural-language order requirements. | Extracted requirements are validated before planning; the model does not select stock or place parts. |
+| **Muse Code** | Used during offline preparation of controller emitters. | Prepared emitters are checked and reused at runtime; a coding agent is not invoked for every job. |
+| **Local geometry and verifier** | Selects compatible stock, nests parts, compiles programs and checks emitted G-code. | Owns placement and software verification; it does not qualify a physical machine or cutting process. |
+
+Order interpretation uses Muse Spark Open through Baseten by default, with
+configured provider failover and guarded Fireworks repair. The worker reviews
+geometry and confirms the exact saved plan after physical cutting.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for system topology, repository layout,
 workflow lifecycles, model roles, nesting, verification and storage.

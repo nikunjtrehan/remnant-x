@@ -14,7 +14,7 @@ from shapely.geometry import Polygon, box
 from backend.api import create_app
 from backend.db_and_parts import CADPartFactory, RemnantWarehouseDB
 from backend.llm_client import LiveModelClient
-from backend.materials import normalize_material
+from backend.materials import normalize_material, sheet_segmentation_concept
 from backend.m1_sam_indexer import RemnantOpticalIndexer, StationCalibrationConfig
 from backend.m2_spark_orchestrator import SparkWarehouseOrchestrator
 from backend.m3_nfp_nester import PlacedPartInstance
@@ -30,6 +30,19 @@ from backend.sam_client import decode_image_output, segment_image
 ])
 def test_canonical_material_preserves_grades(label, canonical):
     assert normalize_material(label) == canonical
+
+
+@pytest.mark.parametrize("material,description,expected", [
+    ("SS304", "sheet", "metal sheet"),
+    ("ss316", " Sheet ", "metal sheet"),
+    ("Aluminium 6061", "sheet", "metal sheet"),
+    ("cardboard", "sheet", "cardboard sheet"),
+    ("acrylic", "sheet", "acrylic sheet"),
+    ("unknown stock", "sheet", "sheet"),
+    ("ss304", "silver remnant", "silver remnant"),
+])
+def test_generic_sam_target_uses_material_and_preserves_custom_description(material, description, expected):
+    assert sheet_segmentation_concept(material, description) == expected
 
 
 def test_material_grade_queries_do_not_substitute(tmp_path):
@@ -257,6 +270,42 @@ def test_sam_uses_responses_sse_and_never_chat_completion(monkeypatch):
     mask, trace = segment_image(llm, np.zeros((334, 320, 3), dtype=np.uint8), "sheet")
     assert len(calls) == 1 and mask.any()
     assert trace["source"] == "meta_sam_3.1"
+
+
+def test_sam_empty_concept_result_requires_explicit_spatial_retry(monkeypatch):
+    client_class = httpx.Client
+    prompts = []
+
+    def transport(request):
+        prompts.append(json.loads(request.content)["input"][0]["content"][0]["text"])
+        events = ([{"type": "response.output_text.delta", "delta": SAM_EXAMPLE.replace("<0f>0", "<0f>1")}]
+                  if len(prompts) == 2 else [])
+        events.append({"type": "response.completed"})
+        return httpx.Response(200, text="".join("data: " + json.dumps(e) + "\n\n" for e in events))
+
+    monkeypatch.setattr("backend.sam_client.httpx.Client", lambda **kw: client_class(transport=httpx.MockTransport(transport), **kw))
+    llm = LiveModelClient()
+    llm.meta_api_key = "fake-unit-test-key"
+    image = np.zeros((334, 320, 3), dtype=np.uint8)
+    with pytest.raises(ValueError, match="ERR_SAM_NO_MATCH"):
+        segment_image(llm, image, "sheet")
+    assert prompts == ["sheet"]  # No hidden paid retry or threshold substitute.
+
+    mask, trace = segment_image(llm, image, concept="", object_id="0", box_prompt=[211, 228, 271, 255])
+    assert prompts[1] == "<0f>1<|box;x1=211;y1=228;x2=270;y2=254;w=320;h=334|>"
+    expected, _ = decode_image_output(SAM_EXAMPLE, image.shape)
+    assert np.array_equal(mask, expected)
+    assert trace["object_id"] == "1" and trace["prompt_kind"] == "box"
+    assert trace["prompt_box_px"] == [211, 228, 271, 255]
+
+
+@pytest.mark.parametrize("region", [[0, 0, 321, 334], [100, 100, 20, 20], [1, 2, 3], [0, 0, True, 10]])
+def test_invalid_spatial_prompt_cannot_call_meta(monkeypatch, region):
+    monkeypatch.setattr("backend.sam_client.httpx.Client", lambda **kw: pytest.fail("Invalid region must not call Meta"))
+    llm = LiveModelClient()
+    llm.meta_api_key = "fake-unit-test-key"
+    with pytest.raises(ValueError, match="ERR_SAM_PROMPT_BOX"):
+        segment_image(llm, np.zeros((334, 320, 3), dtype=np.uint8), concept="", box_prompt=region)
 
 
 def test_no_sam_key_does_not_silently_threshold_and_small_holes_survive():

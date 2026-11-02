@@ -41,6 +41,20 @@ def material_identity(value: str) -> dict:
     return {"material_family": family, "material_grade": token if token.startswith("ss") or token in {"al6061", "al5052", "a36"} else None}
 
 
+def sheet_segmentation_concept(material: str, concept: str) -> str:
+    """Resolve the legacy generic label using supplied stock identity, not vision.
+
+    Explicit descriptions are preserved. This only changes a perception prompt;
+    inventory and order matching continue to use the exact material/grade.
+    """
+    if concept.strip().lower() != "sheet":
+        return concept
+    family = material_identity(material)["material_family"]
+    if family in {"steel", "mild_steel", "carbon_steel", "galvanized_steel", "stainless_steel", "aluminum", "brass", "copper", "titanium"}:
+        return "metal sheet"
+    return {"cardboard": "cardboard sheet", "acrylic": "acrylic sheet"}.get(family, concept)
+
+
 def explicit_prompt_materials(text: str) -> set[str]:
     """Recognize explicit alloys and distinct families without interpreting quantities as alloys."""
     text = text.lower()

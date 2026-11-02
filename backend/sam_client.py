@@ -13,7 +13,7 @@ from meta_sam_parser import CompletedOutcome, decode_mask_to_raster, image_segme
 def decode_image_output(text, image_shape, object_id=None):
     height, width = image_shape[:2]
     if not text.strip():
-        raise ValueError("ERR_SAM_NO_MATCH: refine the concept prompt or recapture the image")
+        raise ValueError("ERR_SAM_NO_MATCH: use a concrete material description or select the sheet region, then retry")
     for rows, cols in re.findall(r";data=(\d+),(\d+),", text):
         if int(rows) * int(cols) > width * height:
             raise ValueError("ERR_SAM_MASK_SIZE")
@@ -44,7 +44,7 @@ def decode_image_output(text, image_shape, object_id=None):
 def segment_image(llm, image, concept="sheet", object_id=None, box_prompt=None):
     if not llm.has_meta:
         raise ValueError("ERR_SAM_NOT_CONFIGURED: set META_API_KEY; local_threshold must be explicitly selected for a local demo")
-    if not concept.strip() or len(concept) > 200:
+    if box_prompt is None and (not concept.strip() or len(concept) > 200):
         raise ValueError("ERR_SAM_CONCEPT: supply a short noun phrase")
     prompt = concept
     if box_prompt is not None:
@@ -56,6 +56,9 @@ def segment_image(llm, image, concept="sheet", object_id=None, box_prompt=None):
             raise ValueError("ERR_SAM_PROMPT_BOX")
         # Input and parser bounds are half-open; wire boxes are inclusive.
         prompt = f"<0f>1<|box;x1={left};y1={top};x2={right-1};y2={bottom-1};w={width};h={height}|>"
+        # Spatial prompts name their own object, independently of any previous
+        # concept response's selected ID. Text is not sent alongside the box.
+        object_id = "1"
     ok, encoded = cv2.imencode(".png", image)
     if not ok:
         raise ValueError("ERR_SAM_IMAGE_ENCODING")
@@ -103,4 +106,6 @@ def segment_image(llm, image, concept="sheet", object_id=None, box_prompt=None):
     mask, selected_id = decode_image_output("".join(chunks), image.shape, object_id)
     return mask, {"source": "meta_sam_3.1", "model": "sam-3.1", "object_id": selected_id,
                   "prompt_kind": "box" if box_prompt is not None else "concept",
+                  "concept": concept if box_prompt is None else None,
+                  "prompt_box_px": list(box_prompt) if box_prompt is not None else None,
                   "latency_ms": round((time.perf_counter() - started) * 1000, 2)}

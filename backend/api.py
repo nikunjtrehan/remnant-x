@@ -23,7 +23,7 @@ from shapely.geometry import Polygon
 
 from backend.db_and_parts import CADPartFactory, RemnantWarehouseDB
 from backend.llm_client import LiveModelClient
-from backend.materials import normalize_material
+from backend.materials import normalize_material, sheet_segmentation_concept
 from backend.m1_sam_indexer import RemnantOpticalIndexer, StationCalibrationConfig
 from backend.m2_spark_orchestrator import SparkWarehouseOrchestrator
 from backend.pipeline import checked_uploads, check_order_uploads, execute_pipeline
@@ -258,7 +258,8 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
                 img_bgr=img_bgr,
                 dxf_out_path=dxf_out,
                 use_live_vision_audit=req.use_live_vision_audit,
-                segmentation_mode=req.segmentation_mode, concept=req.segmentation_concept,
+                segmentation_mode=req.segmentation_mode,
+                concept=sheet_segmentation_concept(material, req.segmentation_concept),
                 object_id=req.segmentation_object_id, use_clahe=req.use_clahe,
                 box_prompt=req.segmentation_box_px,
             )

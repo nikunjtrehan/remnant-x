@@ -1,9 +1,27 @@
 # Current validation evidence
 
-Reviewed on 1 November 2026. This page distinguishes the latest verified test
+Reviewed on 3 November 2026. This page distinguishes the latest verified test
 baseline from earlier integration and physical experiments.
 
-## Current hosted baseline
+## Latest local checks
+
+The 3 November SAM targeting and recovery change passed **224 offline backend
+tests**, **54 frontend tests across 11 files**, TypeScript compilation and a Vite
+production build. The backend suite reports the existing Starlette/HTTPX
+deprecation warning. These tests use temporary databases and mocked model calls.
+
+Separately, two live end-to-end capture requests used the original generic
+`sheet` input and the supplied `ss304` material. Both resolved to `metal sheet`,
+returned the expected **2 / 5 holes**, and remained pending review in a separate
+temporary database. No user inventory was added or modified by these checks.
+The [SAM prompt comparison](architecture/SAM_PROMPT_RECOVERY.md) records the
+alternatives and their limits.
+
+The [Checks workflow](../.github/workflows/checks.yml) runs on each push;
+[published runs](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
+report the corresponding hosted results.
+
+## Earlier hosted baseline: 31 October
 
 [GitHub Actions run 41216278990](https://github.com/nikunjtrehan/remnant-x/actions/runs/41216278990)
 completed successfully on **31 October 2026**, for source revision
@@ -17,9 +35,8 @@ The actual job logs report:
 | TypeScript compilation and Vite production build | Passed |
 | Hosted environment | Windows, Python 3.11 and Node 22 |
 
-These results were read from the existing successful run; this documentation
-review did not rerun the tests or live model calls. The
-[Checks workflow](../.github/workflows/checks.yml) runs again on subsequent pushes.
+These historical results were read from that successful run. They describe
+the earlier source revision, not the new 3 November test totals above.
 
 ## Historical reports
 

@@ -22,12 +22,22 @@ import type { IndexResult, Preflight, ScanFields, Station } from "./types";
 
 const locations = ["Top left", "Top right", "Bottom right", "Bottom left"];
 
+export function defaultSheetConcept(material: string): string {
+  const name = material.trim().toLowerCase();
+  return name === "cardboard"
+    ? "cardboard sheet"
+    : ["acrylic", "plexiglass", "perspex", "pmma"].includes(name)
+      ? "acrylic sheet"
+      : "metal sheet";
+}
+
 export interface CaptureBinding {
   file: File;
   fields: ScanFields;
   station: Station;
   check?: Preflight;
   result?: IndexResult;
+  error?: string;
   locked: boolean;
   onFieldsChange: (fields: ScanFields) => void;
   onStationChange: (station: Station) => void;
@@ -75,7 +85,7 @@ export function Capture({
     batch?.fields.review_id ?? crypto.randomUUID(),
   );
   const [concept, setConcept] = useState(
-      batch?.fields.segmentation_concept ?? "sheet",
+      batch?.fields.segmentation_concept ?? "metal sheet",
     ),
     [clahe, setClahe] = useState(batch?.fields.use_clahe ?? false),
     [rectified, setRectified] = useState(false);
@@ -84,6 +94,13 @@ export function Capture({
       batch?.fields.segmentation_box_px ?? null,
     );
   const locked = !!busy || !!batch?.locked;
+  const analysisError = error || batch?.error || "";
+  const noMatch = !result && /\bERR_SAM_NO_MATCH\b/.test(analysisError);
+  const ambiguousMatch =
+    !result && /\bERR_SAM_OBJECT_SELECTION\b/.test(analysisError);
+  const segmentationFailed = noMatch || ambiguousMatch;
+  const canSelectRegion =
+    !!preflight?.frame && !!preflight.rectified_image_base64;
   const revision = useRef(0),
     photoInput = useRef<HTMLInputElement>(null);
   const stationPanel = useRef<HTMLDetailsElement>(null);
@@ -269,6 +286,12 @@ export function Capture({
     if (batch?.result) setResult(batch.result);
   }, [batch?.result]);
   useEffect(() => {
+    if (segmentationFailed && canSelectRegion && preflight?.ready) {
+      setRectified(true);
+      if (ambiguousMatch) setRegionEnabled(true);
+    }
+  }, [segmentationFailed, ambiguousMatch, canSelectRegion, preflight?.ready]);
+  useEffect(() => {
     batch?.onFieldsChange({
       sheet_id: sheetId,
       material,
@@ -300,7 +323,7 @@ export function Capture({
     }
   };
   const analyze = async () => {
-    if (!preflight?.ready || locked) return;
+    if (!preflight?.ready || locked || (regionEnabled && !box)) return;
     if (batch) {
       batch.onAnalyze();
       return;
@@ -522,19 +545,41 @@ export function Capture({
             Check photograph <ChevronRight size={15} />
           </button>
         )}
+        {segmentationFailed && <ErrorNotice message={analysisError} />}
         {preflight?.ready && !result && (
           <div className="region-controls">
+            {noMatch && (
+              <button
+                className="button secondary full"
+                disabled={locked}
+                onClick={() => {
+                  setConcept(defaultSheetConcept(material));
+                  setBox(null);
+                  setRegionEnabled(false);
+                }}
+              >
+                Use material description
+              </button>
+            )}
             <button
-              className="text-button"
-              disabled={locked}
+              className={
+                segmentationFailed ? "button secondary full" : "text-button"
+              }
+              disabled={locked || !canSelectRegion}
               onClick={() => {
                 setRectified(true);
-                setRegionEnabled((v) => !v);
+                setRegionEnabled((v) => segmentationFailed || !v);
               }}
             >
-              {regionEnabled
-                ? "Finish region selection"
-                : "Select a sheet region (optional)"}{" "}
+              {segmentationFailed
+                ? box
+                  ? "Redraw sheet region"
+                  : noMatch
+                    ? "Select sheet region (optional)"
+                    : "Select sheet region"
+                : regionEnabled
+                  ? "Finish region selection"
+                  : "Select a sheet region (optional)"}{" "}
               →
             </button>
             {box && (
@@ -548,10 +593,12 @@ export function Capture({
             )}
             <p className="hint">
               {box
-                ? "A region prompt will replace the text concept for SAM."
+                ? "A region only tells SAM where to look. After retry, check the outline and every hole; the result may still need a clearer photo."
                 : regionEnabled
-                  ? "Drag around the sheet in the rectified view, keeping its holes inside."
-                  : "If the scene is ambiguous, target the intended sheet before analysis."}
+                  ? "Drag around the whole sheet in the rectified photo, including its holes. The box only locates it; SAM supplies the shape. Review every edge and hole after retry."
+                  : noMatch
+                    ? "Choose a material description or an optional region, then retry. Check the outline and every hole before adding stock."
+                    : "If the scene is ambiguous, target the intended sheet before analysis."}
             </p>
           </div>
         )}
@@ -648,10 +695,14 @@ export function Capture({
             </div>
             <Field label="What should SAM find?">
               <input
-                required
+                required={!box}
                 value={concept}
                 placeholder="e.g. cardboard sheet"
-                onChange={(e) => setConcept(e.target.value)}
+                onChange={(e) => {
+                  setConcept(e.target.value);
+                  setBox(null);
+                  setRegionEnabled(false);
+                }}
               />
             </Field>
             <label className="checkbox-label">
@@ -671,16 +722,22 @@ export function Capture({
             </p>
             <button
               className="button primary full"
-              disabled={!preflight?.ready || locked || !!result}
+              disabled={
+                !preflight?.ready || locked || !!result || (regionEnabled && !box)
+              }
               type="submit"
             >
               <ScanLine size={15} />
-              Find outline & holes
+              {segmentationFailed && box
+                ? "Retry with selected region"
+                : segmentationFailed
+                  ? "Retry outline analysis"
+                  : "Find outline & holes"}
             </button>
           </fieldset>
         </form>
         {busy && <Busy label={busy} />}
-        <ErrorNotice message={error} />
+        {!segmentationFailed && <ErrorNotice message={analysisError} />}
         {result?.saved_remnant && (
           <div className="notice success">
             <CheckCircle2 size={17} />

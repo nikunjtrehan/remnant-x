@@ -188,10 +188,10 @@ workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
-Latest verified hosted checks, **31 October 2026**: **211 backend tests**,
-**49 frontend tests**, TypeScript checks and a successful production build.
-[Current validation summary](docs/VALIDATION_STATUS.md) links the exact CI run
-and distinguishes these totals from the older 184/42 results.
+Latest verified local checks, **3 November 2026**: **224 backend tests**,
+**54 frontend tests**, TypeScript checks and a successful production build.
+[Current validation summary](docs/VALIDATION_STATUS.md) distinguishes this
+revision from the earlier hosted and physical experiments.
 
 - [Physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md): two cardboard
   specimens, eight photos, five correct usable topologies and three blocked
@@ -200,6 +200,10 @@ and distinguishes these totals from the older 184/42 results.
 - [Historical integration review, 30 October](docs/FINAL_READINESS.md): real photo ZIP intake,
   SAM reviews, explicit stock acceptance, a live 50-copy DXF order, saved-plan
   recovery and verified download.
+- [Real-metal SAM targeting, 3 November](docs/architecture/SAM_PROMPT_RECOVERY.md):
+  material-aware full-image requests produced the expected **2 / 5 holes** on
+  two metal photos. Box and crop alternatives exposed errors and were rejected
+  as automatic retries. Visual review remains required.
 - [Frontend validation](Front%20End/VALIDATION.md) and
   [factory scenarios](Front%20End/FACTORY_SCENARIOS.md) distinguish automatic guards,
   operator checks and deferred work.

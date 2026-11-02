@@ -132,7 +132,7 @@ Software verification does not qualify physical sheet measurement, material prop
 | L-shaped piece is absent from nesting | Check whether its geometry review was accepted and whether its batch, material and thickness are selected. |
 | Empty inventory after restart | Check REMNANTX_DB_PATH and REMNANTX_ARTIFACT_DIR. A different path is a different warehouse. |
 | All markers are not visible | Recapture the flat station with marker IDs 0, 1, 2 and 3, including the white borders. |
-| SAM finds no matching sheet | Use a specific concept such as cardboard sheet, inspect the image, or select the intended region. |
+| SAM finds no matching sheet | Select Use material description, then Retry outline analysis. Region selection is optional; review every edge and hole before accepting stock. |
 | DXF import is rejected | Check units, supported entity types, closed planar loops and hole containment. |
 | Two copies fit but a third is unplaced | Review stock selection, grain locks, scale and rotation; the bounded search may miss a legal packing. |
 | A plan becomes stale | Refresh stock and generate a new plan; do not replay an old program against changed inventory. |

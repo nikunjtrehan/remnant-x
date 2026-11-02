@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PhotoBatch } from "./PhotoBatch";
 import { api } from "./api";
@@ -159,12 +159,12 @@ describe("photo-batch workflow", () => {
       render(<PhotoBatch onSaved={() => {}} />);
       await waitFor(() =>
         expect(
-          screen.getByRole("button", { name: "Find outline & holes" }),
+          screen.getByRole("button", { name: "Retry outline analysis" }),
         ).toHaveProperty("disabled", false),
       );
       expect(api.index).toHaveBeenCalledTimes(2);
       await userEvent.click(
-        screen.getByRole("button", { name: "Find outline & holes" }),
+        screen.getByRole("button", { name: "Retry outline analysis" }),
       );
       await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
     } finally {
@@ -186,7 +186,7 @@ describe("photo-batch workflow", () => {
     await userEvent.clear(concept);
     await userEvent.type(concept, "cardboard sheet");
     await userEvent.click(
-      screen.getByRole("button", { name: "Find outline & holes" }),
+      screen.getByRole("button", { name: "Retry outline analysis" }),
     );
     await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
     expect(vi.mocked(api.index).mock.calls[2][2].segmentation_concept).toBe(
@@ -194,6 +194,148 @@ describe("photo-batch workflow", () => {
     );
     await screen.findByText("2 added · 0 ready · 0 need attention");
   });
+  it.each([
+    ["ss304", "metal sheet"],
+    ["cardboard", "cardboard sheet"],
+    ["acrylic", "acrylic sheet"],
+  ])("uses %s description only on request before explicit retry", async (material, description) => {
+    vi.mocked(api.index)
+      .mockRejectedValueOnce(new Error("ERR_SAM_NO_MATCH"))
+      .mockResolvedValue(indexed);
+    render(<PhotoBatch onSaved={() => {}} />);
+    await importTwo();
+    await userEvent.clear(screen.getByLabelText("Material / exact grade"));
+    await userEvent.type(
+      screen.getByLabelText("Material / exact grade"), material,
+    );
+    const concept = screen.getByLabelText("What should SAM find?");
+    await userEvent.clear(concept);
+    await userEvent.type(concept, "my custom offcut description");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
+    );
+    await screen.findByText("1 added · 0 ready · 1 need attention");
+    expect(concept).toHaveProperty("value", "my custom offcut description");
+    expect(api.index).toHaveBeenCalledTimes(2);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Use material description" }),
+    );
+    expect(concept).toHaveProperty("value", description);
+    expect(api.index).toHaveBeenCalledTimes(2);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Retry outline analysis" }),
+    );
+    await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
+    const firstRequest = vi.mocked(api.index).mock.calls[0][2];
+    const retriedRequest = vi.mocked(api.index).mock.calls[2][2];
+    expect(retriedRequest).toEqual(
+      expect.objectContaining({
+        sheet_id: firstRequest.sheet_id,
+        review_id: firstRequest.review_id,
+        material,
+        segmentation_concept: description,
+      }),
+    );
+    expect(retriedRequest.segmentation_box_px).toBeUndefined();
+    await screen.findByText("2 added · 0 ready · 0 need attention");
+  });
+  it.each(["ERR_SAM_NO_MATCH", "ERR_SAM_OBJECT_SELECTION"])(
+    "guides %s to a region prompt and retries only the selected photo on request",
+    async (failure) => {
+      vi.mocked(api.preflight).mockResolvedValue({
+        ...ready,
+        rectified_image_base64: "data:image/png;base64,cGhvdG8=",
+        frame: {
+          width_px: 400,
+          height_px: 300,
+          width_mm: 200,
+          height_mm: 150,
+          pixels_per_mm: 2,
+        },
+      });
+      vi.mocked(api.index)
+        .mockRejectedValueOnce(new Error(failure))
+        .mockResolvedValue(indexed);
+      render(<PhotoBatch onSaved={() => {}} />);
+      await importTwo();
+      const concept = screen.getByLabelText("What should SAM find?");
+      await userEvent.clear(concept);
+      await userEvent.type(concept, "stainless steel offcut");
+      await userEvent.click(
+        screen.getByRole("button", { name: "Find outlines & holes in 2 photos" }),
+      );
+      await screen.findByText("1 added · 0 ready · 1 need attention");
+      expect(api.index).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByAltText("Perspective-corrected indexing station"),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Retry outline analysis" }),
+      ).toHaveProperty("disabled", failure === "ERR_SAM_OBJECT_SELECTION");
+      // A spatial prompt must work without text, while existing custom text is kept.
+      if (failure === "ERR_SAM_OBJECT_SELECTION") await userEvent.clear(concept);
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: failure === "ERR_SAM_NO_MATCH"
+            ? "Select sheet region (optional) →"
+            : "Select sheet region →",
+        }),
+      );
+      const region = screen.getByLabelText("Sheet region selection");
+      vi.spyOn(region, "getBoundingClientRect").mockReturnValue({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 300,
+        right: 400,
+        bottom: 300,
+        toJSON: () => ({}),
+      });
+      Object.defineProperty(region, "setPointerCapture", { value: vi.fn() });
+      fireEvent(
+        region,
+        new MouseEvent("pointerdown", {
+          bubbles: true, clientX: 40, clientY: 30,
+        }),
+      );
+      fireEvent(
+        region,
+        new MouseEvent("pointerup", {
+          bubbles: true, clientX: 300, clientY: 250,
+        }),
+      );
+      await screen.findByRole("button", {
+        name: "Retry with selected region",
+      });
+      await userEvent.click(
+        screen.getByRole("button", { name: "Inspect photo 2: other.png" }),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Inspect photo 1: good.png" }),
+      );
+      const retry = await screen.findByRole("button", {
+        name: "Retry with selected region",
+      });
+      await waitFor(() => expect(retry).toHaveProperty("disabled", false));
+      expect(api.index).toHaveBeenCalledTimes(2);
+      await userEvent.click(retry);
+      await waitFor(() => expect(api.index).toHaveBeenCalledTimes(3));
+      const firstRequest = vi.mocked(api.index).mock.calls[0][2];
+      const retriedRequest = vi.mocked(api.index).mock.calls[2][2];
+      expect(retriedRequest).toEqual(
+        expect.objectContaining({
+          sheet_id: firstRequest.sheet_id,
+          review_id: firstRequest.review_id,
+          segmentation_box_px: [40, 30, 300, 250],
+          segmentation_concept:
+            failure === "ERR_SAM_OBJECT_SELECTION" ? "" : "stainless steel offcut",
+        }),
+      );
+      await screen.findByText("2 added · 0 ready · 0 need attention");
+    },
+  );
   it("keeps material edits bound to the remaining photo after removing the selected photo", async () => {
     render(<PhotoBatch onSaved={() => {}} />);
     await importTwo();

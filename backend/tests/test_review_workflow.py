@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from shapely.geometry import box
@@ -40,6 +41,45 @@ def test_geometry_requires_review_and_acceptance_is_replay_safe(client, monkeypa
     assert client.post("/api/v1/intake-reviews/review-001/accept").json() == accepted
     assert len(client.get("/api/v1/remnants").json()["remnants"]) == 1
     assert client.get("/api/v1/intake-reviews").json()["reviews"] == []
+
+
+def test_no_match_then_spatial_retry_still_requires_geometry_acceptance(client, monkeypatch):
+    calls = []
+
+    def sam(llm, image, concept, object_id, box_prompt):
+        calls.append(box_prompt)
+        if box_prompt is None:
+            assert concept == "metal sheet"
+            raise ValueError("ERR_SAM_NO_MATCH")
+        assert box_prompt == [200, 200, 1000, 700] and concept == ""
+        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        mask[210:690, 210:990] = 255
+        mask[300:350, 300:350] = 0
+        mask[450:500, 700:750] = 0
+        return mask, {"source": "meta_sam_3.1", "prompt_kind": "box", "object_id": "1", "prompt_box_px": box_prompt}
+
+    monkeypatch.setattr("backend.m1_sam_indexer.segment_image", sam)
+    payload = {**photo_payload(), "sheet_id": "RX-REGION", "material": "ss304", "thickness_mm": 0.1,
+               "save_to_warehouse": False, "review_id": "region-review", "segmentation_concept": "sheet"}
+    failed = client.post("/api/v1/index-remnant", json=payload)
+    assert failed.status_code == 422 and "ERR_SAM_NO_MATCH" in failed.text
+    assert calls == [None]
+    assert client.get("/api/v1/intake-reviews").json()["reviews"] == []
+    assert client.get("/api/v1/remnants").json()["remnants"] == []
+
+    retry = {**payload, "segmentation_concept": "", "segmentation_box_px": [200, 200, 1000, 700]}
+    response = client.post("/api/v1/index-remnant", json=retry)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["hole_count"] == 2 and result["review_status"] == "pending"
+    assert result["vision_audit"]["segmentation"]["prompt_kind"] == "box"
+    assert client.get("/api/v1/remnants").json()["remnants"] == []
+    assert client.post("/api/v1/index-remnant", json=retry).json() == result
+    assert len(calls) == 2  # Recovering the completed review never repeats SAM.
+    accepted = client.post("/api/v1/intake-reviews/region-review/accept")
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["saved_remnant"]["material"] == "ss304"
+    assert len(client.get("/api/v1/remnants").json()["remnants"]) == 1
 
 
 def test_rejection_and_physical_id_collision_cannot_replace_stock(client):

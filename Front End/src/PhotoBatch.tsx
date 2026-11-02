@@ -9,7 +9,7 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react";
-import { Capture } from "./Capture";
+import { Capture, defaultSheetConcept } from "./Capture";
 import { api, downloadText } from "./api";
 import { collectPhotos, readFile } from "./photo-import";
 import type { SourcePhoto } from "./photo-import";
@@ -389,10 +389,7 @@ export function PhotoBatch({
               sheet_id: `REM_${id.replaceAll("-", "").slice(0, 16).toUpperCase()}`,
               material: defaults.material,
               thickness_mm: defaults.thickness,
-              segmentation_concept:
-                defaults.material.trim().toLowerCase() === "cardboard"
-                  ? "cardboard sheet"
-                  : "sheet",
+              segmentation_concept: defaultSheetConcept(defaults.material),
               use_clahe: false,
               review_id: crypto.randomUUID(),
               location: "",
@@ -508,7 +505,8 @@ export function PhotoBatch({
           i.fields.thickness_mm < 0.1 ||
           i.fields.thickness_mm > 50 ||
           !Number.isFinite(i.fields.thickness_mm) ||
-          !i.fields.segmentation_concept.trim(),
+          (!i.fields.segmentation_box_px &&
+            !i.fields.segmentation_concept.trim()),
       )
     ) {
       setError(
@@ -681,10 +679,10 @@ export function PhotoBatch({
                           material: defaults.material,
                           thickness_mm: defaults.thickness,
                           segmentation_concept:
-                            i.fields.segmentation_concept === "sheet" &&
-                            defaults.material.trim().toLowerCase() ===
-                              "cardboard"
-                              ? "cardboard sheet"
+                            [
+                              "sheet", "metal sheet", "cardboard sheet", "acrylic sheet",
+                            ].includes(i.fields.segmentation_concept)
+                              ? defaultSheetConcept(defaults.material)
                               : i.fields.segmentation_concept,
                         },
                         revision: i.revision + 1,
@@ -912,6 +910,7 @@ export function PhotoBatch({
             station,
             check: selected.check,
             result: selected.result,
+            error: selected.error,
             locked: !!busy || selected.status === "added",
             onFieldsChange: fieldsChanged,
             onStationChange: changeStation,

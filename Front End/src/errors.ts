@@ -33,15 +33,15 @@ const guidance: Record<string, [string, string]> = {
   ],
   ERR_SAM_OBJECT_SELECTION: [
     "Choose one sheet",
-    "Use the region selector around the intended remnant, including its holes, or photograph it separately.",
+    "Select one whole remnant in the rectified photo, including its holes, then retry. The box only locates it; review SAM's outline and every hole before adding stock. Separate overlapping sheets before photographing them.",
   ],
   ERR_NO_SHEET_FOUND: [
     "No usable sheet was detected",
     "Check the photograph and the object description, select the intended region, or retake the photo.",
   ],
   ERR_SAM_NO_MATCH: [
-    "No sheet matched the description",
-    "Describe the visible sheet, select its region or recapture. No stock was added.",
+    "SAM could not identify the sheet",
+    "Use the entered material to reset the description, then retry. You can also select the sheet's region or recapture. Review the outline and every hole before adding stock. No stock was added.",
   ],
   ERR_INVALID_MASK_TOPOLOGY: [
     "The outline could not be traced reliably",

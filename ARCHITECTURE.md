@@ -253,6 +253,16 @@ The request path:
 
 The UI's normal photo path selects segmentation_mode=sam. local_threshold is an explicit demo option whose provenance is recorded as local_threshold; the pipeline excludes it unless allow_demo_stock=true. Optional CLAHE normalization is off by default. Optional surface advice is advisory and does not certify dimensions or grade.
 
+The generic legacy concept `sheet` is resolved from the supplied material before
+the request (for example, `ss304` becomes the perception prompt `metal sheet`).
+Explicit descriptions and inventory grade identity are preserved. The trace
+records the actual concept. After no match, the UI offers an explicit
+material-description reset or optional region selection; neither triggers an
+automatic paid retry. Spatial requests replace the text concept and select their
+own prompted object ID. All returned masks still require validation and review.
+The [real-metal prompt comparison](docs/architecture/SAM_PROMPT_RECOVERY.md)
+explains why automatic box or crop retries were rejected.
+
 ### 3.6 Polygon construction and review gate
 
 build_topological_polygon uses OpenCV RETR_CCOMP contour hierarchy. It selects the largest exterior contour, rejects a too-small sheet and rejects more than one significant disconnected outer sheet in the mask. Child contours are retained as interior holes; there is no default minimum-hole-area filter. It rejects invalid topology rather than silently repairing it. The result is exported as a DXF and also serialized as millimetre geometry.
@@ -838,27 +848,29 @@ The postprocessor does not execute user-supplied Python, and DXF paths are confi
 
 ### 13.1 Automated checks recorded in the repository
 
-The current verified hosted baseline is **211 backend tests and 49 frontend tests**,
-plus TypeScript checks and a successful production build. These counts come from
-[CI run 41216278990](https://github.com/nikunjtrehan/remnant-x/actions/runs/41216278990)
-on 31 October 2026 at source revision `1e1efbe`. See the
+The latest local verification on **3 November 2026** passed **224 backend tests
+and 54 frontend tests**, plus TypeScript checks and a production build. See the
 [current validation summary](docs/VALIDATION_STATUS.md) for the evidence and scope.
 
 | Check | Current recorded result | Evidence |
 |---|---:|---|
-| Offline backend suite | 211 passed; one deprecation warning | Hosted CI run linked above |
-| Frontend unit/interaction tests | 49 passed across 11 files | Same hosted CI run |
-| TypeScript and Vite production build | Passed | Same hosted CI run |
+| Offline backend suite | 224 passed; one deprecation warning | Local run, 3 November |
+| Frontend unit/interaction tests | 54 passed across 11 files | Local run, 3 November |
+| TypeScript and Vite production build | Passed | Local run, 3 November |
 | GitHub Actions environment | Windows, Python 3.11 and Node 22 | [Checks workflow](.github/workflows/checks.yml) |
 
-**Historical baseline:** the [30 October integration report](docs/FINAL_READINESS.md)
+**Historical hosted baseline:** [CI run 41216278990](https://github.com/nikunjtrehan/remnant-x/actions/runs/41216278990)
+passed 211 backend / 49 frontend tests on 31 October at revision `1e1efbe`.
+
+The [30 October integration report](docs/FINAL_READINESS.md)
 records 184 backend tests, 42 frontend tests and a zero-vulnerability dependency
 audit at that time. Those dated observations are retained as history; they are
 not the current test totals or a newly performed dependency audit.
 
-The figures above were verified from existing CI logs, not a fresh test run made
-while editing this document. Cloud-provider and live SAM operations remain
-separate opt-in checks, outside the offline regression suite.
+Cloud-provider and live SAM operations remain separate opt-in checks, outside
+the offline regression suite. The 3 November real-metal SAM check and its
+rejected recovery alternatives are recorded in the
+[prompt comparison](docs/architecture/SAM_PROMPT_RECOVERY.md).
 
 ### 13.2 What the tests exercise
 

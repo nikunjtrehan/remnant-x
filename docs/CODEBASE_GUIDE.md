@@ -106,6 +106,12 @@ Key entry points: StationCalibrationConfig, CalibrationReport, IndexedRemnantRes
 
 Calls the Meta Responses endpoint with the configured SAM model, image and concept/region prompt. meta-sam-parser decodes the actual model output into a raster mask. Response image dimensions, selected object, bounds and nonempty content must agree. Missing matches or malformed output are failures requiring attention, not permission to invent geometry.
 
+The API resolves the legacy generic `sheet` label from the entered material and
+records the effective concept. Failed photos offer explicit description/region
+recovery; drawing a box does not itself call SAM. The
+[real-metal comparison](architecture/SAM_PROMPT_RECOVERY.md) records both the
+successful material-aware path and the rejected automatic-retry alternatives.
+
 Key entry points: decode_image_output, segment_image.
 
 ### Provider transport

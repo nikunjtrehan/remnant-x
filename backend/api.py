@@ -161,10 +161,10 @@ def create_app(db_path: Optional[str] = None, artifact_dir: Optional[str] = None
                         continue
                     if (
                         thickness_mm is not None
-                        and abs(r.thickness_mm - thickness_mm) > 1e-3
+                        and abs(r.thickness_mm - thickness_mm) > 0.01
                     ):
                         continue
-                    if r.usable_area_mm2 >= min_usable_area_mm2:
+                    if r.usable_area_mm2 > 0 and r.usable_area_mm2 >= min_usable_area_mm2:
                         records.append(r)
 
         return {

@@ -337,6 +337,20 @@ describe("order workflow", () => {
       screen.getByText(/This preview covers the placed subset/),
     ).toBeTruthy();
   });
+  it("keeps an already completed plan marked as completed when a preview retry returns its receipt", async () => {
+    vi.mocked(api.execute).mockResolvedValue({
+      ...result,
+      operator_confirmed_at: "2026-11-03T12:00:00Z",
+      stock_update_basis: "operator_reported_cut_complete",
+    });
+    render(<Plan {...props} />);
+    await parseOrder();
+    await userEvent.click(screen.getByRole("button", { name: "Nest & verify" }));
+    await screen.findByText("Stock updated, all sheets together.");
+    expect(screen.getByRole("button", { name: "Download completed-job G-code" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Record completed cut" })).toBeNull();
+    expect(props.onInventoryChanged).toHaveBeenCalled();
+  });
   it("keeps a live interpretation error visible instead of substituting an example", async () => {
     vi.mocked(api.parse).mockRejectedValue(
       new Error("ERR_MISSING_INPUT: Supply thickness"),

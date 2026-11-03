@@ -179,6 +179,6 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
     }
     if req.plan_id and batch_result.total_placed == batch_result.total_requested:
         result["plan_id"] = req.plan_id
-        save_plan(db, req.plan_id, request_hash, result, pending_cuts, order_spec.kerf_mm,
+        return save_plan(db, req.plan_id, request_hash, result, pending_cuts, order_spec.kerf_mm,
                   expected_wkts, {sid: (sheet_map[sid].material, sheet_map[sid].thickness_mm, sheet_map[sid].source) for sid in pending_cuts})
     return result

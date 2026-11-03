@@ -233,8 +233,8 @@ export function Plan({
       setResult(planned);
       if (planned.plan_id) setPlanId(planned.plan_id);
       if (planned.stale_inventory?.length) setPlanId("");
-      setCommitted(commit);
-      if (commit) onInventoryChanged();
+      setCommitted(commit || !!planned.operator_confirmed_at);
+      if (commit || planned.operator_confirmed_at) onInventoryChanged();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -512,7 +512,7 @@ export function Plan({
                         {dxfStocks.map(([key, sheet]) => <option key={key} value={key}>{sheet.material} · {sheet.thickness_mm} mm</option>)}
                       </select>
                       <Field label="DXF kerf (mm)">
-                        <input type="number" min="0" max="20" step="0.1" disabled={!!busy} value={dxfKerf}
+                        <input type="number" min="0" max="15" step="0.1" disabled={!!busy} value={dxfKerf}
                           onChange={e => { setDxfKerf(Number(e.target.value)); setOrder(null); invalidate(); }} />
                       </Field>
                       <p className="hint">{dxfStock

@@ -1,4 +1,16 @@
 const guidance: Record<string, [string, string]> = {
+  ERR_MODEL_ORDER_JSON: [
+    "The AI response could not be read",
+    "No order was created. Try Review order again, or choose Build parts list and enter the dimensions and quantity directly. Your inventory has not changed.",
+  ],
+  ERR_UNPARSED_ORDER: [
+    "This request needs an explicit parts list",
+    "The automatic parser could not read the complete request safely. Choose Build parts list to enter every part, dimension and quantity. Your inventory has not changed.",
+  ],
+  ERR_MODEL_CHANGED_MATERIAL_GRADE: [
+    "The AI changed the requested material grade",
+    "No order was accepted. Retry Review order or use Build parts list to enter the exact grade. Your inventory has not changed.",
+  ],
   ERR_DUPLICATE_CAPTURE: [
     "This photograph was already analyzed",
     "Recover its saved review or inspect the existing stock record. A renamed file or a new stock ID does not make this a new sheet.",

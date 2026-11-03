@@ -42,7 +42,7 @@ class ConfirmCutRequest(RequestModel):
 class OrderStockContext(RequestModel):
     material: str = Field(min_length=1, max_length=80, pattern=r"^[a-zA-Z0-9_ -]+$")
     thickness_mm: float = Field(ge=0.1, le=50)
-    kerf_mm: float = Field(default=1, ge=0, le=20)
+    kerf_mm: float = Field(default=1, ge=0, le=15)
 
 class NaturalLanguageOrderRequest(RequestModel):
     stock: Optional[OrderStockContext] = None

@@ -191,10 +191,13 @@ workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
-Latest verified local checks, **3 November 2026**: **232 backend tests**,
-**56 frontend tests**, TypeScript checks and a successful production build.
+Latest verified local checks, **3 November 2026**: **261 backend tests**,
+**60 frontend tests**, TypeScript checks and a successful production build.
 [Current validation summary](docs/VALIDATION_STATUS.md) distinguishes this
 revision from the earlier hosted and physical experiments.
+
+The [code audit](docs/architecture/CODE_AUDIT_20261103.md) records reproduced
+defects, isolated regression cases and the narrow fixes applied.
 
 - [Physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md): two cardboard
   specimens, eight photos, five correct usable topologies and three blocked

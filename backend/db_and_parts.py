@@ -197,6 +197,7 @@ class RemnantWarehouseDB:
                 WHERE material = ?
                   AND ABS(thickness_mm - ?) <= ?
                   AND usable_area_mm2 >= ?
+                  AND usable_area_mm2 > 0
                 ORDER BY usable_area_mm2 ASC
             """,
                 (

@@ -19,6 +19,15 @@ import math
 import time
 
 
+def _numeric(value, error_code):
+    if isinstance(value, bool):
+        raise ValueError(error_code)
+    try:
+        return float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(error_code) from exc
+
+
 SHAPE_SYNONYMS: Dict[str, str] = {
     "circle": "circle",
     "disc": "circle",
@@ -150,13 +159,13 @@ class SparkWarehouseOrchestrator:
         if not material:
             raise ValueError("ERR_INVALID_ORDER: 'material' must be specified.")
 
-        thickness_mm = float(payload.get("thickness_mm", 0.0))
+        thickness_mm = _numeric(payload.get("thickness_mm", 0.0), "ERR_INVALID_THICKNESS: Sheet thickness must be a number in millimetres.")
         if not math.isfinite(thickness_mm) or not 0.1 <= thickness_mm <= 50:
             raise ValueError(
                 f"ERR_INVALID_THICKNESS: thickness_mm ({thickness_mm}) outside 2D sheet range (0.1..50.0mm)."
             )
 
-        kerf_mm = float(payload.get("kerf_mm", 3.0))
+        kerf_mm = _numeric(payload.get("kerf_mm", 3.0), "ERR_INVALID_KERF: Cutting clearance must be a number in millimetres.")
         if not math.isfinite(kerf_mm) or not 0 <= kerf_mm <= 15:
             raise ValueError(f"ERR_INVALID_KERF: kerf_mm ({kerf_mm}) out of range.")
 
@@ -171,6 +180,7 @@ class SparkWarehouseOrchestrator:
         for idx, item in enumerate(raw_parts):
             if not isinstance(item, dict) or set(item) - set(RequestedPartItem.__dataclass_fields__):
                 raise ValueError("ERR_INVALID_PART_SCHEMA")
+            item = dict(item)
             p_id = str(item.get("part_id", f"PART_{idx + 1:02d}")).strip()
             if not p_id or len(p_id) > 100:
                 raise ValueError("ERR_INVALID_PART_ID")
@@ -192,7 +202,7 @@ class SparkWarehouseOrchestrator:
                         break
 
             qty_raw = item.get("quantity", 1)
-            if isinstance(qty_raw, bool) or not isinstance(qty_raw, (int, float)) or not math.isfinite(qty_raw) or int(qty_raw) != qty_raw or qty_raw > 10000:
+            if isinstance(qty_raw, bool) or not isinstance(qty_raw, (int, float)) or not 1 <= qty_raw <= 10000 or int(qty_raw) != qty_raw:
                 raise ValueError("ERR_INVALID_QUANTITY: integer 1..10000 required")
             qty = int(qty_raw)
             if any(p.part_id == p_id for p in parsed_items):
@@ -200,9 +210,10 @@ class SparkWarehouseOrchestrator:
             if not isinstance(item.get("grain_locked", False), bool):
                 raise ValueError("ERR_INVALID_GRAIN_LOCK")
             for key in ("diameter_mm", "outer_diam_mm", "inner_diam_mm", "width_mm", "height_mm", "thickness_leg_mm"):
-                value = float(item.get(key, 0))
+                value = _numeric(item.get(key) if item.get(key) is not None else 0, "ERR_INVALID_DIMENSION: " + key + " must be a number in millimetres.")
                 if not math.isfinite(value) or not 0 <= value <= 100000:
                     raise ValueError("ERR_INVALID_DIMENSION: " + key)
+                item[key] = value
             if qty <= 0:
                 raise ValueError(
                     f"ERR_INVALID_QUANTITY: Part {p_id} has quantity {qty} <= 0."
@@ -362,7 +373,8 @@ class SparkWarehouseOrchestrator:
         Ambiguous or unsupported clauses fail instead of producing partial orders.
         """
         intent = inspect_order_prompt(raw_prompt, uploaded_dxf_files)
-        text = raw_prompt.lower()
+        # A comma before "each" continues the same part's dimensions.
+        text = re.sub(r",\s*(?=each\b)", " ", raw_prompt.lower())
         if re.search(r"(?<![a-z0-9])[-+]\s*\d|(?<![0-9])\.\d", text):
             raise ValueError("ERR_AMBIGUOUS_NUMBER: use unsigned dimensions with a leading digit")
         spans = []
@@ -607,38 +619,52 @@ class SparkWarehouseOrchestrator:
             return parsed
 
         repair_trace = None
+        format_error = None
+        parsed = None
         if res["ok"]:
             try:
                 parsed = checked_response(res)
             except ValueError as original_error:
                 if not getattr(self.llm, "has_fireworks", False) or res.get("provider") == "fireworks":
-                    raise
-                repair_trace = {"provider": res.get("provider"), "model": res.get("model"),
-                                "validation_error": str(original_error), "usage": res.get("usage", {})}
-                # One grounded repair of a complete prompt, never invention of
-                # missing requirements or AI-generated manufacturing settings.
-                res = self.llm.chat_completion(
-                    system_prompt=system_prompt + "\nCorrect the rejected extraction using only the original request. Output the full schema.",
-                    user_prompt=raw_prompt + "\nRejected extraction: " + json.dumps(res.get("parsed_json"))
-                    + "\nDeterministic validation error: " + str(original_error),
-                    prefer_provider="fireworks", failover=False, timeout_sec=30,
-                    max_tokens=2048, temperature=0.1)
-                parsed = checked_response(res)
-            self.last_llm_trace = {
-                "ok": True,
-                "provider": res["provider"],
-                "model": res["model"],
-                "latency_ms": round((time.perf_counter() - parse_started) * 1000, 2),
-                "reasoning_content": res["reasoning_content"],
-                "raw_content": res["content"],
-                "usage": res["usage"],
-                "error": None,
-                "rejected_primary": repair_trace,
-                "repair_attempted": repair_trace is not None,
-            }
-            return parsed
+                    if str(original_error) != "ERR_MODEL_ORDER_JSON":
+                        raise
+                    format_error = original_error
+                else:
+                    repair_trace = {"provider": res.get("provider"), "model": res.get("model"),
+                                    "validation_error": str(original_error), "usage": res.get("usage", {})}
+                    # One grounded repair; never invent missing requirements.
+                    res = self.llm.chat_completion(
+                        system_prompt=system_prompt + "\nCorrect the rejected extraction using only the original request. Output the full schema.",
+                        user_prompt=raw_prompt + "\nRejected extraction: " + json.dumps(res.get("parsed_json"))
+                        + "\nDeterministic validation error: " + str(original_error),
+                        prefer_provider="fireworks", failover=False, timeout_sec=30,
+                        max_tokens=2048, temperature=0.1)
+                    try:
+                        parsed = checked_response(res)
+                    except ValueError as repair_error:
+                        if str(repair_error) != "ERR_MODEL_ORDER_JSON":
+                            raise
+                        if str(original_error) != "ERR_MODEL_ORDER_JSON":
+                            raise original_error from repair_error
+                        format_error = repair_error
+            if parsed is not None:
+                self.last_llm_trace = {
+                    "ok": True,
+                    "provider": res["provider"],
+                    "model": res["model"],
+                    "latency_ms": round((time.perf_counter() - parse_started) * 1000, 2),
+                    "reasoning_content": res["reasoning_content"],
+                    "raw_content": res["content"],
+                    "usage": res["usage"],
+                    "error": None,
+                    "rejected_primary": repair_trace,
+                    "repair_attempted": repair_trace is not None,
+                }
+                return parsed
+            res["error"] = res.get("error") or str(format_error)
 
-        # Upgrade #2: Deterministic Regex Fallback if all cloud endpoints are unreachable
+        # HTTP success with no usable JSON is also a model-output failure.
+        # The bounded fallback must still pass the original intent/grade guards.
         fallback_dict = self.fallback_regex_parse_prompt(
             raw_prompt, uploaded_dxf_files=uploaded_dxf_files
         )
@@ -649,11 +675,13 @@ class SparkWarehouseOrchestrator:
                 "model": "regex-bom-compiler-v1",
                 "latency_ms": round((time.perf_counter() - parse_started) * 1000, 2),
                 "reasoning_content": (
-                    f"Cloud API unreachable ({res.get('error')}); parsed deterministically via local regex compiler."
+                    f"Cloud order unavailable or unreadable ({res.get('error')}); parsed with the limited local grammar."
                 ),
                 "raw_content": str(fallback_dict),
                 "usage": {},
                 "error": res.get("error"),
+                "rejected_primary": repair_trace,
+                "repair_attempted": repair_trace is not None,
             }
             return self.validate_and_parse_order_dict(
                 fallback_dict, uploaded_dxf_files=uploaded_dxf_files

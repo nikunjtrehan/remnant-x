@@ -850,14 +850,14 @@ The postprocessor does not execute user-supplied Python, and DXF paths are confi
 
 ### 13.1 Automated checks recorded in the repository
 
-The latest local verification on **3 November 2026** passed **232 backend tests
-and 56 frontend tests**, plus TypeScript checks and a production build. See the
+The latest local verification on **3 November 2026** passed **261 backend tests
+and 60 frontend tests**, plus TypeScript checks and a production build. See the
 [current validation summary](docs/VALIDATION_STATUS.md) for the evidence and scope.
 
 | Check | Current recorded result | Evidence |
 |---|---:|---|
-| Offline backend suite | 232 passed; one deprecation warning | Local run, 3 November |
-| Frontend unit/interaction tests | 56 passed across 11 files | Local run, 3 November |
+| Offline backend suite | 261 passed; one deprecation warning | Local run, 3 November |
+| Frontend unit/interaction tests | 60 passed across 12 files | Local run, 3 November |
 | TypeScript and Vite production build | Passed | Local run, 3 November |
 | GitHub Actions environment | Windows, Python 3.11 and Node 22 | [Checks workflow](.github/workflows/checks.yml) |
 

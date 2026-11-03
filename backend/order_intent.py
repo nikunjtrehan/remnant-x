@@ -194,7 +194,7 @@ def signature(parts):
                   'rectangle': ('width_mm', 'height_mm'),
                   'l_bracket': ('width_mm', 'height_mm', 'thickness_leg_mm'), 'dxf_file': ('dxf_path',)}[shape]
         dims = tuple(str(Path(part[k]).resolve()).lower() if k == 'dxf_path' else round(float(part[k]), 5) for k in fields)
-        if shape in ('rectangle', 'l_bracket') and not part.get('grain_locked', False):
+        if shape == 'rectangle' and not part.get('grain_locked', False):
             dims = (*sorted(dims[:2]), *dims[2:])
         grouped[(shape, dims, bool(part.get('grain_locked', False)))] += part['quantity']
     return dict(grouped)

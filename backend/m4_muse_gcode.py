@@ -449,6 +449,9 @@ class GCodeCompiler:
                         contour = current_chain[lead_count:]
                         if len(contour) < 4 or contour[0] != contour[-1]:
                             raise ValueError("open or empty cut contour")
+                        cut_polygon = Polygon(contour)
+                        if not cut_polygon.is_valid or not math.isfinite(cut_polygon.area) or cut_polygon.area <= 0:
+                            raise ValueError("cut contour collapsed or became invalid at output precision")
                         active_cut_chains.append(current_chain)
                     laser_on = False
                     laser_known_off = True

@@ -404,6 +404,10 @@ The original benchmark used 20 prompts, three repetitions and two policies: 120 
 
 **backend/tests/test_placement_report.py**: DXF import-to-order fit explanations, undersized stock, partial quantities, successful spillover, unchanged inventory and proof versus unsuccessful search.
 
+**backend/tests/test_order_json_recovery.py**: Malformed model replies, failed repairs and exact-prompt recovery with unchanged requirement guards.
+
+**backend/tests/test_audit_regressions.py**: Reproduced numeric, shape, output-precision, concurrent retry, review duplication, availability and filtering defects in isolated warehouses.
+
 **backend/tests/test_dxf_copy_prompt.py**: Upload-to-order quantities, this/it references, visible stock context, offline parsing and conflicting settings.
 
 **backend/tests/test_module0_db.py**: Warehouse persistence and inventory operations.

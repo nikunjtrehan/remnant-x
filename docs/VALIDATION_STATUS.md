@@ -5,13 +5,19 @@ baseline from earlier integration and physical experiments.
 
 ## Latest local checks
 
-The 3 November DXF fit-report change passed **232 offline backend tests**,
-**56 frontend tests across 11 files**, TypeScript compilation and a Vite
+The 3 November code audit and JSON recovery changes passed **261 offline backend tests**,
+**60 frontend tests across 12 files**, TypeScript compilation and a Vite
 production build. The backend suite reports the existing Starlette/HTTPX
 deprecation warning. These tests use temporary databases and mocked model calls.
-Eight new backend cases distinguish failed import from insufficient stock,
-prove successful spillover, explain partial quantities and keep search failures
-separate from geometric impossibility. See the [fit-report design](architecture/DXF_FIT_REPORT.md).
+The [code audit](architecture/CODE_AUDIT_20261103.md) records 21 reproduced
+audit cases. Eight [JSON recovery cases](architecture/ORDER_JSON_RECOVERY.md)
+cover unreadable model responses and the exact recording prompt. Frontend
+tests retain their original assertions/time limits and run with one worker to
+avoid resource-contention timeouts on this Windows machine.
+
+The preceding DXF fit-report change passed 232 backend / 56 frontend tests at
+its own revision. Its [fit-report design](architecture/DXF_FIT_REPORT.md)
+distinguishes failed import, geometric constraints and unsuccessful searches.
 
 The preceding SAM targeting and recovery change passed 224 backend / 54 frontend
 tests at its own revision; it is included in the newer suite above.

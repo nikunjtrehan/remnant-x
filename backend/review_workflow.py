@@ -28,8 +28,16 @@ def cached_review(db, review_id, request_hash):
 def save_review(db, review_id, request_hash, result):
     payload = json.dumps(result, allow_nan=False)
     with db._connect() as conn:
-        conn.execute("INSERT INTO intake_reviews(review_id,request_hash,payload) VALUES(?,?,?)", (review_id, request_hash, payload))
-    return get_review(db, review_id)
+        conn.execute("BEGIN IMMEDIATE")
+        photo_hash = result.get("photo_sha256")
+        if photo_hash and conn.execute(
+            "SELECT 1 FROM intake_reviews WHERE accepted>=0 AND review_id<>? "
+            "AND json_extract(payload,'$.photo_sha256')=?", (review_id, photo_hash)
+        ).fetchone():
+            raise ValueError("ERR_DUPLICATE_CAPTURE: Recover the existing review or inspect its stock record.")
+        conn.execute("INSERT INTO intake_reviews(review_id,request_hash,payload) VALUES(?,?,?) "
+                     "ON CONFLICT(review_id) DO NOTHING", (review_id, request_hash, payload))
+    return cached_review(db, review_id, request_hash)
 
 
 def pending_reviews(db):
@@ -76,6 +84,7 @@ def accept_review(db, review_id):
 
 def reject_review(db, review_id):
     with db._connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT accepted FROM intake_reviews WHERE review_id=?", (review_id,)).fetchone()
         if row is None:
             raise ValueError("ERR_REVIEW_NOT_FOUND")
@@ -112,8 +121,11 @@ def save_plan(db, plan_id, request_hash, result, cuts, kerf, expected_wkts, expe
                "cuts": {sid: [p.wkt for p in parts] for sid, parts in cuts.items()},
                "expected_wkts": expected_wkts, "expected_inventory": expected_inventory}
     with db._connect() as conn:
-        conn.execute("INSERT INTO verified_plans(plan_id,payload) VALUES(?,?)",
+        conn.execute("INSERT INTO verified_plans(plan_id,payload) VALUES(?,?) ON CONFLICT(plan_id) DO NOTHING",
                      (plan_id, json.dumps(payload, allow_nan=False)))
+    # A concurrent retry must recover the stored program, not return a newly
+    # computed program under someone else's saved plan ID. Hash checks still apply.
+    return get_plan(db, plan_id, request_hash)
 
 
 def confirm_plan(db, plan_id):

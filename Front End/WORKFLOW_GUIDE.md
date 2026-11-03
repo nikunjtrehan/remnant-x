@@ -152,3 +152,19 @@ resizing occurs.
 The cutting plan lists smallest usable remnant first, copies placed on each sheet,
 and copies still needed. Unused later candidates are marked “Not needed.”
 Incomplete batches remain incomplete and cannot be exported as complete jobs.
+
+### Understand a partial fit or no fit
+
+The plan distinguishes **Software verified**, **Partial fit**, and **No fit found**.
+Each remnant shows how many copies were placed and still need stock. Where a
+copy remains, the result notice identifies an area/size constraint, a drawing
+that matches the whole remnant, or a search that found no valid position around
+holes and clearance. Next steps appear beside that remnant. A failed search
+alone does not prove that every possible layout is impossible. Reasons appear
+directly in the incomplete-result notice, beside the planning controls.
+
+Sheet tabs include zero-placement remnants, so their boundaries and holes can
+still be inspected. An imported DXF supplies the new part's shape and size;
+the scanned stock's exported DXF describes the material already available.
+See the [sample part](../examples/mounting_plate_60x40mm.dxf) and
+[fit-report design](../docs/architecture/DXF_FIT_REPORT.md).

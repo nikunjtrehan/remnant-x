@@ -329,12 +329,12 @@ describe("order workflow", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Nest & verify" }),
     );
-    await screen.findByText("Partial batch");
+    await screen.findByText("Partial fit", { exact: true });
     expect(
       screen.queryByRole("button", { name: /Replan & update stock/ }),
     ).toBeNull();
     expect(
-      screen.getByText(/Programs cover the placed subset only/),
+      screen.getByText(/This preview covers the placed subset/),
     ).toBeTruthy();
   });
   it("keeps a live interpretation error visible instead of substituting an example", async () => {

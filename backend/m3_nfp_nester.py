@@ -207,6 +207,8 @@ class HoleAwareNester:
 
     def _find_best_pose_on_sheet(self, part_spec, free_space, raw_sheet_poly, already_placed):
         del free_space  # NFPs encode raw-stock voids and placed solids directly.
+        if part_spec.polygon.area > raw_sheet_poly.area + 1e-6:
+            return None
         kerf = self.kerf_mm
         covered_stock = prep(raw_sheet_poly.buffer(1e-8))
         stock_boundary = raw_sheet_poly.boundary

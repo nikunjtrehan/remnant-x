@@ -450,3 +450,5 @@
 .stock-allocation summary { cursor: pointer; font-weight: 600; }
 .stock-allocation ol { padding-left: 22px; margin-bottom: 0; }
 .stock-allocation li { margin: 8px 0; font-size: 13px; }
+.fit-explanation { margin-top: 8px; padding: 10px 12px; border-left: 3px solid #b38242; background: #fffaf0; border-radius: 0 6px 6px 0; }
+.fit-explanation p { margin: 4px 0; line-height: 1.5; }

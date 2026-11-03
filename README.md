@@ -47,6 +47,9 @@ rectangle alone does not describe the material available for a new job.
    Review the interpreted requirements before planning.
 4. **Plan:** inspect hole-aware nesting across compatible sheets and download
    the final software-verified G-code. A partial job cannot update stock.
+   Per-remnant checks explain undersized stock, clearance and unsuccessful
+   placement searches. A [sample part DXF](examples/mounting_plate_60x40mm.dxf)
+   is available for rehearsal.
 5. **Record:** after actual cutting, explicitly report completion of the exact
    reviewed program. All affected sheets update atomically; stale plans are blocked.
 
@@ -188,8 +191,8 @@ workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
-Latest verified local checks, **3 November 2026**: **224 backend tests**,
-**54 frontend tests**, TypeScript checks and a successful production build.
+Latest verified local checks, **3 November 2026**: **232 backend tests**,
+**56 frontend tests**, TypeScript checks and a successful production build.
 [Current validation summary](docs/VALIDATION_STATUS.md) distinguishes this
 revision from the earlier hosted and physical experiments.
 

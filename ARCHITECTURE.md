@@ -119,6 +119,7 @@ remnant-x/
     postprocessor.py             Restricted prepared-emitter loader
     postprocessors/              Checked-in GRBL and LinuxCNC emitters + manifests
     pipeline.py                  End-to-end order execution
+    placement_report.py          Per-remnant fit counts, constraints and next steps
     review_workflow.py           Durable photo reviews, saved plans and receipts
     tests/                       Backend regression and integration tests
 
@@ -159,6 +160,7 @@ The frontend is a browser application, not Electron. The backend is a local Pyth
 | m4_muse_gcode.py | GCodeCompiler, verify_gcode_toolpath | Generates numeric cut paths, orders contours, applies a prepared profile emitter and verifies final program geometry/process words. |
 | postprocessor.py | emit_prepared, validated_emitter | Checks the source manifest and loads only the narrow checked-in Python emitter contract. |
 | pipeline.py | execute_pipeline | Orchestrates order validation, stock selection, nesting, compilation, final verification, complete-plan save and optional legacy direct commit. |
+| placement_report.py | build_placement_checks | Reports per-part/per-remnant counts, proven size/area constraints, unsuccessful searches and operator next steps without rerunning the solver. |
 | review_workflow.py | accept_review, save_plan, get_plan, confirm_plan | Persists pending photo reviews and exact verified plans; confirms a saved plan once against current inventory. |
 | serialization.py | polygon_to_dict, dict_to_polygon, result serializers | Keeps API geometry/result representations separate from internal Shapely objects. |
 
@@ -424,7 +426,7 @@ pipeline.py serializes the result before the optional direct commit, so a respon
 
 ### 5.2 Stock eligibility
 
-RemnantWarehouseDB.query_compatible_remnants filters by normalized material identity, thickness within the default ±0.01 mm tolerance and minimum usable area sufficient for at least one requested part. Results are ordered smallest usable area first. The orchestrator constructs part geometries and the pipeline applies optional selected stock IDs.
+RemnantWarehouseDB.query_compatible_remnants filters by normalized material identity and thickness within the default ±0.01 mm tolerance. The orchestrator includes undersized compatible stock so the result can explain why it was skipped; the nester rejects parts exceeding a sheet's material area before searching positions. Results remain ordered smallest usable area first, and the pipeline applies optional selected stock IDs. placement_report.py records per-part fit counts and reasons; unsuccessful bounded searches are distinguished from proven size or area constraints. See the [DXF fit-report design](docs/architecture/DXF_FIT_REPORT.md).
 
 The pipeline excludes records sourced from demo or local_threshold, as well as IDs beginning DEMO_, unless allow_demo_stock=true. A user-selected batch restricts candidates; the pipeline does not silently borrow unselected inventory. The actual geometry (including holes) is used, not just the stock's bounding box.
 
@@ -848,14 +850,14 @@ The postprocessor does not execute user-supplied Python, and DXF paths are confi
 
 ### 13.1 Automated checks recorded in the repository
 
-The latest local verification on **3 November 2026** passed **224 backend tests
-and 54 frontend tests**, plus TypeScript checks and a production build. See the
+The latest local verification on **3 November 2026** passed **232 backend tests
+and 56 frontend tests**, plus TypeScript checks and a production build. See the
 [current validation summary](docs/VALIDATION_STATUS.md) for the evidence and scope.
 
 | Check | Current recorded result | Evidence |
 |---|---:|---|
-| Offline backend suite | 224 passed; one deprecation warning | Local run, 3 November |
-| Frontend unit/interaction tests | 54 passed across 11 files | Local run, 3 November |
+| Offline backend suite | 232 passed; one deprecation warning | Local run, 3 November |
+| Frontend unit/interaction tests | 56 passed across 11 files | Local run, 3 November |
 | TypeScript and Vite production build | Passed | Local run, 3 November |
 | GitHub Actions environment | Windows, Python 3.11 and Node 22 | [Checks workflow](.github/workflows/checks.yml) |
 

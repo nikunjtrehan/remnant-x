@@ -16,6 +16,7 @@ from backend.m4_muse_gcode import GCodeCompiler
 from backend.schemas import FullPipelineRequest
 from backend.serialization import serialize_compiled_gcode, serialize_remnant, serialize_sheet_outcome
 from backend.review_workflow import get_plan, save_plan
+from backend.placement_report import build_placement_checks
 
 
 def checked_uploads(paths, upload_root: Path):
@@ -82,6 +83,8 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
         sheets=plan.candidate_sheets,
         part_specs=plan.cad_part_specs,
     )
+    placement_checks = build_placement_checks(plan.candidate_sheets, plan.cad_part_specs,
+                                             batch_result, order_spec.kerf_mm)
 
     timings["nesting_ms"] = round((time.perf_counter() - stage) * 1000, 2)
     stage = time.perf_counter()
@@ -168,6 +171,7 @@ def execute_pipeline(req: FullPipelineRequest, db, llm: LiveModelClient, upload_
             "sheets_used": batch_result.sheets_used,
             "sanitizer_verified": batch_result.sanitizer_verified,
             "unplaced_instances": batch_result.unplaced_instances,
+            "placement_checks": placement_checks,
             "sheet_outcomes": outcomes_json,
         },
         "gcode_programs": compiled_gcodes,

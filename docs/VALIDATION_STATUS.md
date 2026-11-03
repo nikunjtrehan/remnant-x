@@ -5,10 +5,16 @@ baseline from earlier integration and physical experiments.
 
 ## Latest local checks
 
-The 3 November SAM targeting and recovery change passed **224 offline backend
-tests**, **54 frontend tests across 11 files**, TypeScript compilation and a Vite
+The 3 November DXF fit-report change passed **232 offline backend tests**,
+**56 frontend tests across 11 files**, TypeScript compilation and a Vite
 production build. The backend suite reports the existing Starlette/HTTPX
 deprecation warning. These tests use temporary databases and mocked model calls.
+Eight new backend cases distinguish failed import from insufficient stock,
+prove successful spillover, explain partial quantities and keep search failures
+separate from geometric impossibility. See the [fit-report design](architecture/DXF_FIT_REPORT.md).
+
+The preceding SAM targeting and recovery change passed 224 backend / 54 frontend
+tests at its own revision; it is included in the newer suite above.
 
 Separately, two live end-to-end capture requests used the original generic
 `sheet` input and the supplied `ss304` material. Both resolved to `metal sheet`,

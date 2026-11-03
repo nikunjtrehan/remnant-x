@@ -45,12 +45,13 @@ export function CuttingPlan({
     shownResult?.nesting.sheet_outcomes.filter(
       (s) => s.placed_parts.length > 0,
     ) ?? [];
-  const outcome = outcomes.find((s) => s.sheet_id === sheetId) ?? outcomes[0];
-  const stock = shownResult?.candidate_sheets.find(
-    (s) => s.sheet_id === outcome?.sheet_id,
-  );
+  const candidates = shownResult?.candidate_sheets ?? [];
+  const stock = candidates.find((s) => s.sheet_id === sheetId)
+    ?? candidates.find((s) => s.sheet_id === outcomes[0]?.sheet_id)
+    ?? candidates[0];
+  const outcome = outcomes.find((s) => s.sheet_id === stock?.sheet_id);
   const program = shownResult?.gcode_programs.find(
-    (p) => p.sheet_id === outcome?.sheet_id,
+    (p) => p.sheet_id === stock?.sheet_id,
   );
   useEffect(() => {
     setPathPlaying(false);
@@ -94,7 +95,9 @@ export function CuttingPlan({
               {shownResult
                 ? complete
                   ? "A useful future for this remnant."
-                  : "Some parts still need a home."
+                  : shownResult.nesting.total_placed
+                    ? "Some parts still need a home."
+                    : "No placement found in the selected remnants."
                 : "Room for your next idea."}
             </h2>
             {shownResult && (
@@ -120,7 +123,7 @@ export function CuttingPlan({
                   Software verified
                 </>
               ) : (
-                "Partial batch"
+                shownResult.nesting.total_placed ? "Partial fit" : "No fit found"
               )
             ) : (
               "Plan view"
@@ -164,25 +167,30 @@ export function CuttingPlan({
                 const before = shownResult.candidate_sheets.slice(0, index).reduce((n, prior) =>
                   n + (shownResult.nesting.sheet_outcomes.find(s => s.sheet_id === prior.sheet_id)?.placed_parts.length ?? 0), 0);
                 const remaining = Math.max(0, shownResult.nesting.total_requested - before - placed);
+                const checks = shownResult.nesting.placement_checks?.filter(c => c.sheet_id === sheet.sheet_id && c.remaining > 0) ?? [];
                 return <li key={sheet.sheet_id}><strong>{sheet.sheet_id}</strong>
                   {" · "}{formatNumber(sheet.usable_area_mm2 / 100)} cm² usable ·{" "}
                   {before >= shownResult.nesting.total_requested ? "Not needed" : placed + " placed · " + remaining + " still needed"}
+                  {complete && checks.map(check => <div className="fit-explanation" key={check.part_id}>
+                    <p><strong>{check.part_id}</strong> · drawing bounds {formatNumber(check.width_mm)} × {formatNumber(check.height_mm)} mm · {check.placed}/{check.requested} placed here</p>
+                    <p>{check.message}</p>
+                  </div>)}
                 </li>;
               })}
             </ol>
           </details>
         )}
-        {!!outcomes.length && (
+        {!!candidates.length && (
           <div
             className="sheet-tabs"
             role="tablist"
             aria-label="Sheets in cutting plan"
           >
-            {outcomes.map((s, i) => (
+            {candidates.map((s, i) => (
               <button
                 key={s.sheet_id}
                 role="tab"
-                aria-selected={outcome?.sheet_id === s.sheet_id}
+                aria-selected={stock?.sheet_id === s.sheet_id}
                 onClick={() => {
                   setSheetId(s.sheet_id);
                   setSelectedPart("");
@@ -190,13 +198,13 @@ export function CuttingPlan({
               >
                 <Layers2 size={12} />
                 Sheet {i + 1}
-                <span>{s.placed_parts.length} parts</span>
+                <span>{outcomes.find(o => o.sheet_id === s.sheet_id)?.placed_parts.length ?? 0} placed</span>
               </button>
             ))}
           </div>
         )}
         <SheetViewer
-          key={`${example}-${outcome?.sheet_id ?? "empty"}`}
+          key={`${example}-${stock?.sheet_id ?? "empty"}`}
           geometry={stock?.geometry}
           parts={outcome?.placed_parts}
           program={program}
@@ -337,7 +345,9 @@ export function CuttingPlan({
                   ? "Operator-reported cut complete · predicted stock updated from this exact plan."
                   : stale
                     ? "Outdated plan · current stock must be reviewed before use."
-                    : "Verified program · cutting not confirmed · this plan has not updated stock."}
+                    : !program
+                      ? "No cutting program generated · no stock updated."
+                      : "Verified program · cutting not confirmed · this plan has not updated stock."}
             </div>
           </>
         ) : (
@@ -353,16 +363,25 @@ export function CuttingPlan({
             <div className="notice warning">
               <FileText size={17} />
               <div>
-                <strong>
-                  {shownResult.nesting.total_requested -
-                    shownResult.nesting.total_placed}{" "}
-                  parts were not placed.
-                </strong>
-                <p>{shownResult.nesting.unplaced_instances.join(", ")}</p>
+                <strong>{shownResult.nesting.total_placed
+                  ? `Partial fit: ${shownResult.nesting.total_placed} of ${shownResult.nesting.total_requested} parts placed.`
+                  : `No fit found: 0 of ${shownResult.nesting.total_requested} part${shownResult.nesting.total_requested === 1 ? "" : "s"} placed.`}</strong>
+                <p>All {candidates.length} compatible remnant{candidates.length === 1 ? " was" : "s were"} checked, smallest first.</p>
+                {(shownResult.nesting.placement_checks ?? []).filter(check => check.remaining > 0).map(check => (
+                  <div className="fit-explanation" key={`${check.sheet_id}-${check.part_id}`}>
+                    <p><strong>{check.sheet_id}</strong> · {check.placed}/{check.requested} placed here</p>
+                    <p>{check.part_id} · drawing bounds {formatNumber(check.width_mm)} × {formatNumber(check.height_mm)} mm</p>
+                    <p>{check.message}</p>
+                    <p><strong>Next step:</strong> {check.next_step}</p>
+                  </div>
+                ))}
                 <p>
-                  Programs cover the placed subset only. A partial batch cannot
-                  update inventory.
+                  {shownResult.nesting.total_placed
+                    ? "This preview covers the placed subset. Complete the order before downloading programs or recording a cut."
+                    : "No G-code was generated. Choose suitable stock or check the uploaded part drawing."}
+                  {" "}Inventory has not been changed.
                 </p>
+                <details><summary>Unplaced part IDs</summary><p>{shownResult.nesting.unplaced_instances.join(", ")}</p></details>
               </div>
             </div>
           )}
@@ -375,7 +394,7 @@ export function CuttingPlan({
               <div className="check-row">
                 <span>Placement geometry</span>
                 <span>
-                  {shownResult.nesting.sanitizer_verified ? (
+                  {!shownResult.nesting.total_placed ? "Not applicable · no parts placed" : shownResult.nesting.sanitizer_verified ? (
                     <>
                       <Check size={13} />
                       Passed

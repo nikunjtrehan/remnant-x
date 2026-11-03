@@ -593,6 +593,10 @@ export function Plan({
                 </span>
                 <Plus size={15} />
               </button>
+              <p className="hint">
+                Upload a drawing of the part you want to make. Station photos
+                supply the remnant stock; this DXF supplies the new part.
+              </p>
               <div className="upload-tray">
                 {uploads.map((u, i) => (
                   <div className="uploaded-part" key={u.dxf_path}>

@@ -99,6 +99,18 @@ export interface PipelineResult {
     total_placed: number;
     sanitizer_verified: boolean;
     unplaced_instances: string[];
+    placement_checks?: {
+      sheet_id: string;
+      part_id: string;
+      width_mm: number;
+      height_mm: number;
+      requested: number;
+      placed: number;
+      remaining: number;
+      reason: string;
+      message: string;
+      next_step: string;
+    }[];
     sheet_outcomes: SheetOutcome[];
     search: Record<string, unknown>;
   };

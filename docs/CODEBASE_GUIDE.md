@@ -186,6 +186,16 @@ Resolves input and managed uploads, loads stock, applies selected-sheet restrict
 
 Key entry points: checked_uploads, check_order_uploads, execute_pipeline.
 
+**backend/placement_report.py**
+
+Explains the final plan per part and compatible remnant. It records placed and
+remaining quantities, drawing bounds, geometric constraints and practical next
+steps. Too-small stock remains visible rather than disappearing from the
+candidate list. Proven area/span limits are distinguished from a bounded
+search finding no position; the report does not ask a model to invent a reason.
+
+Key entry point: build_placement_checks. See docs/architecture/DXF_FIT_REPORT.md.
+
 ### Reviews and exact-plan completion
 
 **backend/review_workflow.py**
@@ -391,6 +401,8 @@ The original benchmark used 20 prompts, three repetitions and two policies: 120 
 **backend/tests/test_api_server.py**: HTTP route contracts and application behavior.
 
 **backend/tests/test_batch_stock_selection.py**: Selected stock restrictions, no borrowing unselected inventory and changed-selection replay protection.
+
+**backend/tests/test_placement_report.py**: DXF import-to-order fit explanations, undersized stock, partial quantities, successful spillover, unchanged inventory and proof versus unsuccessful search.
 
 **backend/tests/test_dxf_copy_prompt.py**: Upload-to-order quantities, this/it references, visible stock context, offline parsing and conflicting settings.
 

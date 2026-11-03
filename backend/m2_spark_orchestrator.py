@@ -322,12 +322,12 @@ class SparkWarehouseOrchestrator:
         total_solid_area = round(
             sum(s.solid_area_mm2 * s.quantity for s in cad_specs), 2
         )
-        min_single_part_area = min(s.solid_area_mm2 for s in cad_specs)
-
+        # Keep material/thickness-compatible stock visible in the fit report,
+        # including remnants too small for any part. The nester skips them cheaply.
         all_compatible = self.db.query_compatible_remnants(
             material=order.material,
             thickness_mm=order.thickness_mm,
-            min_usable_area_mm2=min_single_part_area,
+            min_usable_area_mm2=0,
         )
 
         target_single_sheet_area = total_solid_area * area_packing_safety_factor

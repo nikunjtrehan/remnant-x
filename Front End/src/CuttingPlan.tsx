@@ -133,7 +133,7 @@ export function CuttingPlan({
         {stock && (
           <p className="stock-pick">
             <strong>
-              {example ? "Example sheet " : "Use physical sheet "}
+              {example ? "Example sheet " : outcome ? "Use physical sheet " : "Inspect remnant "}
               {stock.sheet_id}
             </strong>{" "}
             · {stock.material} · {stock.thickness_mm} mm ·{" "}
@@ -346,7 +346,9 @@ export function CuttingPlan({
                   : stale
                     ? "Outdated plan · current stock must be reviewed before use."
                     : !program
-                      ? "No cutting program generated · no stock updated."
+                      ? shownResult.nesting.total_placed
+                        ? "Not used in this plan · no cutting program for this remnant."
+                        : "No cutting program generated · no stock updated."
                       : "Verified program · cutting not confirmed · this plan has not updated stock."}
             </div>
           </>

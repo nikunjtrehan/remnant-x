@@ -24,7 +24,7 @@ describe("sheet-specific artifacts", () => {
     expect(screen.getByText("No fit found", { exact: true })).not.toBeNull();
     expect(screen.getByRole("tab", { name: /Sheet 1/ })).not.toBeNull();
     // A rejected placement still shows the actual stock, rather than a blank canvas.
-    expect(screen.getByText(/Use physical sheet/)).not.toBeNull();
+    expect(screen.getByText(/Inspect remnant/)).not.toBeNull();
   });
   it("explains failed remnants, supports inspecting each, and keeps partial orders uncommitted", async () => {
     const result = structuredClone(raw.result) as unknown as PipelineResult;
@@ -44,7 +44,7 @@ describe("sheet-specific artifacts", () => {
     expect(screen.getByText(/Choose a larger remnant/)).not.toBeNull();
     expect(screen.getByRole("button", { name: "Download G-code" }).hasAttribute("disabled")).toBe(true);
     await userEvent.click(screen.getByRole("tab", { name: /Sheet 1/ }));
-    expect(screen.getByText(/Use physical sheet/).textContent).toContain("TOO_SMALL");
+    expect(screen.getByText(/Inspect remnant/).textContent).toContain("TOO_SMALL");
     expect(screen.getByRole("button", { name: "Inspect planned path" }).hasAttribute("disabled")).toBe(true);
     expect(screen.queryByRole("button", { name: "Record completed cut" })).toBeNull();
   });
@@ -60,6 +60,7 @@ describe("sheet-specific artifacts", () => {
       ...result.candidate_sheets[0],
       sheet_id: "SECOND_SHEET",
     });
+    result.candidate_sheets.push({ ...result.candidate_sheets[0], sheet_id: "UNUSED_STOCK" });
     result.gcode_programs.push({
       ...result.gcode_programs[0],
       sheet_id: "SECOND_SHEET",
@@ -89,5 +90,9 @@ describe("sheet-specific artifacts", () => {
       "SECOND SHEET VERIFIED FIXTURE",
       "SECOND_SHEET.nc",
     );
+    await userEvent.click(screen.getByRole("tab", { name: /Sheet 3/ }));
+    expect(screen.getByText(/Inspect remnant/).textContent).toContain("UNUSED_STOCK");
+    expect(screen.getByText("Not used in this plan · no cutting program for this remnant.")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Download G-code" }).hasAttribute("disabled")).toBe(true);
   });
 });

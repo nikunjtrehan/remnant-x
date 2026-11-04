@@ -1,6 +1,6 @@
 # Remnant X Architecture
 
-**Source-audited implementation reference · 31 October 2026**
+**Implementation reference · initial source audit: 31 October 2026 · documentation updated: 4 November 2026**
 
 Remnant X is a desktop-first manufacturing workbench for turning photographs of sheet remnants into reviewed digital inventory, then planning requested parts against that inventory. A worker captures a remnant on a measured four-marker ArUco station, reviews the reconstructed boundary and holes, enters an order or imports vendor DXFs, inspects a multi-sheet layout and its controller programs, and explicitly records completion after the physical cut.
 

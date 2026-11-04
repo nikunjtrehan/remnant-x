@@ -47,7 +47,7 @@ rectangle alone does not describe the material available for a new job.
 5. **Record:** after actual cutting, explicitly report completion of the exact
    reviewed program. All affected sheets update atomically; stale plans are blocked.
 
-Workers do not enter measurements of existing holes. Ruler measurements in our
+Workers do not enter measurements of existing holes. Ruler measurements in my
 validation reports are independent test references, never model inputs.
 
 ## Try the example (no API keys)
@@ -98,6 +98,7 @@ simple, measured capture station:
    geometry into inventory.
 
 For the full capture walkthrough and calibration notes, see the
+[capture SOP](docs/CAPTURE_SOP.md),
 [local startup guide](docs/LOCAL_STARTUP.md) and
 [physical validation report](docs/architecture/PHYSICAL_VALIDATION_20261030.md).
 This is a photo-capture procedure, not a machine-operation or cutting-process
@@ -145,7 +146,7 @@ supported geometry and equivalent startup commands.
 - **Photo-derived inventory geometry:** ArUco calibration and Meta SAM 3.1 produce candidate remnant outlines and holes. Workers review the geometry and supply the physical stock ID, material grade and thickness.
 - **Flexible order intake:** describe a job in natural language or import supported vendor DXFs. Extracted requirements are checked before planning.
 - **Hole-aware, multi-sheet nesting:** place parts across compatible remnants while accounting for sheet boundaries and existing cutouts. Search is bounded and heuristic; the planner reports any parts it could not place.
-- **Verified controller programs:** compile and independently check output for the `ISO_6983_GRBL` and `LINUXCNC_LASER` profiles before download. Remnant X does not connect to or control a cutting machine.
+- **Verified controller programs:** emits software-verified G-code for GRBL and LinuxCNC profiles (`ISO_6983_GRBL`, `LINUXCNC_LASER`). Remnant X does not connect to or control a cutting machine.
 - **Operator-gated inventory updates:** saved plans retain stock snapshots, stale plans are blocked, and affected inventory updates atomically only after the operator reports that the exact reviewed cut has completed.
 
 ## Architecture
@@ -185,18 +186,24 @@ workflow lifecycles, model roles, nesting, verification and storage.
 
 ## Evidence and limits
 
-Latest verified local checks, **3 November 2026**: **261 backend tests**,
+Latest verified local checks, **4 November 2026**: **279 backend tests**,
 **60 frontend tests**, TypeScript checks and a successful production build.
 [Current validation summary](docs/VALIDATION_STATUS.md) distinguishes this
 revision from the earlier hosted and physical experiments.
 
-The [code audit](docs/architecture/CODE_AUDIT_20261103.md) records reproduced
-defects, isolated regression cases and the narrow fixes applied.
+The [fresh-clone audit](docs/architecture/REPRODUCIBILITY_AUDIT_20261104.md) records
+reproduced defects, isolated regression cases and contributor setup checks.
 
+- [Real-metal SAM targeting, 3 November](docs/architecture/SAM_PROMPT_RECOVERY.md):
+  the two photographed metal remnants had their expected **2 and 5 holes**
+  detected with material-aware full-image requests. Worker review remains required;
+  broader glare conditions have not yet been characterized.
 - [Physical test](docs/architecture/PHYSICAL_VALIDATION_20261030.md): two cardboard
   specimens, eight photos, five correct usable topologies and three blocked
-  captures. Exterior error reached **7.32 mm**; this is not uniform millimetre
-  accuracy. Corrected ruler references were supplied after results.
+  captures. Median absolute exterior-dimension error was **about 4.15 mm**;
+  **7.32 mm was the worst recorded case**. Across all 50 tabulated dimensions,
+  spans and offsets, median absolute error was about **1.45 mm**. Medians are
+  derived from rounded published tables; ruler references were corrected after results.
 - [Three-copy cardboard experiment, 31 October](docs/architecture/ROTATED_STOCK_NESTING.md):
   one part on Piece B and two on Piece A. Both final programs passed software
   verification, with zero reported cutting path across existing stock holes or
@@ -204,16 +211,16 @@ defects, isolated regression cases and the narrow fixes applied.
 - [Historical integration review, 30 October](docs/FINAL_READINESS.md): real photo ZIP intake,
   SAM reviews, explicit stock acceptance, a live 50-copy DXF order, saved-plan
   recovery and verified download.
-- [Real-metal SAM targeting, 3 November](docs/architecture/SAM_PROMPT_RECOVERY.md):
-  material-aware full-image requests produced the expected **2 / 5 holes** on
-  two metal photos. Box and crop alternatives exposed errors and were rejected
-  as automatic retries. Visual review remains required.
 - [Frontend validation](Front%20End/VALIDATION.md) and
   [factory scenarios](Front%20End/FACTORY_SCENARIOS.md) distinguish automatic guards,
   operator checks and deferred work.
 
-This is a supervised local prototype. Metal/glare performance and real-machine
-cutting are unqualified. Output uses centerline contours without dimensional
+This is a supervised local prototype. Real-machine cutting has not been demonstrated;
+neither controller execution nor a controller simulator has been validated.
+Planning uses the selected `kerf_mm` clearance (UI default **1 mm**) between parts,
+boundaries and holes. There is **no separately calibrated photo-error margin**;
+clearance is not proof that physical measurement errors are covered.
+Output uses centerline contours without dimensional
 kerf compensation. Supported profiles are `ISO_6983_GRBL` and `LINUXCNC_LASER`;
 vendor DXFs accept closed straight polylines and closed planar splines, with declared mm/cm/m/inch units converted to mm. Spline import uses a disclosed 0.05 mm chord tolerance; arbitrary CAD is not supported.
 See the [engineering reference](docs/ENGINEERING_GUIDE.md) for precise limits.
@@ -231,7 +238,11 @@ See the [engineering reference](docs/ENGINEERING_GUIDE.md) for precise limits.
 
 From the root: `.\.venv\Scripts\python.exe -m pytest -q`.
 From `Front End`: `npm run check`. Tests use offline providers; live smoke tests
-are separate and opt-in. The [Checks workflow](.github/workflows/checks.yml)
+are separate and opt-in. From the root,
+`.\.venv\Scripts\python.exe -m benchmarks.replay_report` checks the published
+120-trial historical archive and its two DXF fixtures without model calls.
+This replays historical evidence, not current-model performance.
+The [Checks workflow](.github/workflows/checks.yml)
 runs these checks on push and pull requests. [View hosted results.](https://github.com/nikunjtrehan/remnant-x/actions/workflows/checks.yml)
 
 [Engineering decisions](https://nikunjtrehan.github.io/remnant-x/engineering-decisions/) · [Watch the demo on YouTube](https://youtu.be/w_baW3A8f0M)

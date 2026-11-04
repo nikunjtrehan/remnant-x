@@ -850,15 +850,16 @@ The postprocessor does not execute user-supplied Python, and DXF paths are confi
 
 ### 13.1 Automated checks recorded in the repository
 
-The latest local verification on **3 November 2026** passed **261 backend tests
+The latest local verification on **4 November 2026** passed **279 backend tests
 and 60 frontend tests**, plus TypeScript checks and a production build. See the
 [current validation summary](docs/VALIDATION_STATUS.md) for the evidence and scope.
 
 | Check | Current recorded result | Evidence |
 |---|---:|---|
-| Offline backend suite | 261 passed; one deprecation warning | Local run, 3 November |
-| Frontend unit/interaction tests | 60 passed across 12 files | Local run, 3 November |
-| TypeScript and Vite production build | Passed | Local run, 3 November |
+| Offline backend suite | 279 passed; one deprecation warning | Fresh-clone audit, 4 November |
+| Frontend unit/interaction tests | 60 passed across 12 files | Fresh-clone audit, 4 November |
+| TypeScript and Vite production build | Passed | Fresh-clone audit, 4 November |
+| Public historical benchmark replay | 120 trials and two DXF fixtures verified | Offline replay, 4 November |
 | GitHub Actions environment | Windows, Python 3.11 and Node 22 | [Checks workflow](.github/workflows/checks.yml) |
 
 **Historical hosted baseline:** [CI run 41216278990](https://github.com/nikunjtrehan/remnant-x/actions/runs/41216278990)
@@ -891,9 +892,22 @@ The frontend suite covers intake, UI behavior, IndexedDB file recovery, review r
 
 ### 13.3 Integrated and physical evidence
 
+On 3 November, material-aware full-image SAM requests detected the expected
+**2 and 5 holes** in two metal-remnant photos. This is topology evidence, not an
+independent dimensional survey. Broader glare conditions have not yet been
+characterized. See the [prompt comparison](docs/architecture/SAM_PROMPT_RECOVERY.md)
+and [capture SOP](docs/CAPTURE_SOP.md).
+
 docs/FINAL_READINESS.md records an actual browser-to-backend exercise using two physical cardboard pieces photographed in the measured station. A covered-marker image was blocked, real Meta SAM 3.1 geometry was reviewed and accepted, a vendor DXF was uploaded, a Baseten Muse Spark Open request interpreted a 50-copy order, the 50-part plan passed software verification and its saved result was recovered after refresh/API restart. A separate nine-part job was planned across both sheets with both programs verified. Preview and download did not consume stock; no completion receipt was recorded during that exercise.
 
-The physical validation report contains the source measurements and limitations. It reports exterior dimension errors reaching 7.32 mm; the experiment covers a small cardboard sample and does not establish repeatability or general dimensional acceptance. The reported UI/API integration scenarios are evidence of workflow execution, not evidence of metal cutting or industrial qualification.
+The physical validation report contains the source measurements and limitations.
+Median absolute exterior-dimension error is about **4.15 mm**, with **7.32 mm
+worst case**. Across all 50 tabulated dimensions, hole spans and offsets, median
+absolute error is about **1.45 mm**; both medians are calculated from rounded
+public tables. This small, non-blind cardboard experiment does not establish
+general dimensional acceptance. Planning uses the selected `kerf_mm` gap; no
+separate calibrated photo-error margin is applied. UI/API workflow execution
+does not establish metal cutting or industrial qualification.
 
 The [31 October rotated-stock experiment](docs/architecture/ROTATED_STOCK_NESTING.md)
 then checked the accepted photo-derived stock with the original-size decorative
@@ -915,7 +929,13 @@ Remnant X must not be described as:
 - a system with guaranteed zero physical collision or zero dimensional error;
 - a proven source of financial or CO₂ savings.
 
-The implementation is a supervised software planning prototype. Physical validation beyond the documented cardboard work, broader image conditions/materials, actual metal cutting, machine setup, workholding, process qualification and measured savings remain outside the evidence.
+The implementation is a supervised software planning prototype. It emits
+software-verified G-code for GRBL and LinuxCNC profiles. Neither actual controller
+execution nor controller-simulator execution has been demonstrated. Evidence
+includes measured cardboard geometry and two metal-photo topology checks;
+broader glare conditions have not yet been characterized. Actual metal cutting,
+machine registration, workholding, process qualification and measured savings
+remain outside the evidence.
 
 ## 14. Architectural Decisions and Trade-offs
 

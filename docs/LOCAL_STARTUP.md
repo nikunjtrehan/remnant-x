@@ -25,6 +25,11 @@ Open PowerShell in the repository. Skip installation commands when the existing 
 
 Edit the local .env file and set real provider keys. Do not paste keys into the frontend, source files, screenshots, Word documents or GitHub. Copying .env.example only when .env is absent protects existing credentials. Virtual-environment activation is unnecessary because the commands explicitly invoke its Python executable.
 
+If `py -3.11` cannot find an installed interpreter, check `python --version`.
+If it reports Python 3.11, use `python -m venv .venv` instead. Otherwise install
+Python 3.11 or invoke its known executable path explicitly; a vendor-managed
+Python installation may not be registered with the Windows `py` launcher.
+
 Install frontend dependencies once, or again when package-lock.json changes.
 
     Set-Location 'D:\remnant-X\Front End'
@@ -76,6 +81,23 @@ This deliberately selects demo_warehouse.db and artifacts\demo. Startup does not
 Open http://127.0.0.1:5173. The checked-in Vite configuration proxies /api to the backend at port 8000. If port 5173 is occupied, identify the existing server before opening another copy. The strict port flag prevents silently moving to a different browser origin with different saved history.
 
 Select Live workspace for your own photographs. Example and Guided walkthrough display a labeled recorded synthetic run and do not start live inference.
+
+## Verify a contributor checkout without provider credits
+
+From the repository root, after installing the development dependencies:
+
+    .\.venv\Scripts\python.exe -m pip check
+    .\.venv\Scripts\python.exe -m pytest -q
+    .\.venv\Scripts\python.exe -m benchmarks.order_interpretation --prepare
+    .\.venv\Scripts\python.exe -m benchmarks.replay_report
+
+Then run `npm run check` in `Front End`. The replay checks the **historical**
+120-trial archive and its two public DXF fixtures. It does not measure current
+provider performance. Live comparison/preparation tools are separate opt-in
+operations; see the [benchmark guide](../benchmarks/README.md).
+
+Follow the [capture SOP](CAPTURE_SOP.md) for station preparation, review criteria,
+recorded setup details and the distinction between clearance and photo accuracy.
 
 ## Run a fresh cardboard test
 

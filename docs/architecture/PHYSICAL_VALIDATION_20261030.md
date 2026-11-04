@@ -6,6 +6,30 @@ and one rejected clipped capture. Two further photos stopped before SAM.
 This supports a cardboard demonstration; it does not establish uniformly ±5 mm
 accuracy or qualify metal cutting.
 
+## Error summary derived from the published tables
+
+Added 4 November 2026; this summarizes the measurements below, not a new run.
+Each observation contributes `abs(observed - revised reference)` in millimetres.
+
+| Scope | Comparisons | Median absolute error | Worst recorded error |
+| --- | ---: | ---: | ---: |
+| Exterior width and height only | 10 | About **4.15 mm** | **7.32 mm** |
+| All tabulated dimensions, hole spans and offsets | 50 | About **1.45 mm** | **7.32 mm** |
+
+Medians use the rounded public tables (24 comparisons for A and 26 for B).
+The 7.32 mm worst case retains the original report's full-precision observation;
+the corresponding rounded table difference is 7.3 mm. These are repeated,
+correlated features from **two specimens in five usable captures**, not 50
+independent specimens. Reference corrections followed the results.
+
+Planning uses the order's selected `kerf_mm` gap (UI default 1 mm), with no
+separately calibrated photo-error margin. The measured errors must not be
+interpreted as covered by that gap. See the [capture SOP](../CAPTURE_SOP.md).
+
+Later [real-metal tests](SAM_PROMPT_RECOVERY.md) detected the expected 2 and 5
+holes in two photos. That evidence is separate from these cardboard dimensions;
+broader glare conditions have not yet been characterized.
+
 ## Inputs and reference revisions
 
 The station was confirmed unchanged: black-marker spans 657/658 mm top/bottom,

@@ -1,15 +1,22 @@
 # Current validation evidence
 
-Reviewed on 3 November 2026. This page distinguishes the latest verified test
+Reviewed on 4 November 2026. This page distinguishes the latest verified test
 baseline from earlier integration and physical experiments.
 
 ## Latest local checks
 
-The 3 November code audit and JSON recovery changes passed **261 offline backend tests**,
+The 4 November fresh-clone audit passed **279 offline backend tests**,
 **60 frontend tests across 12 files**, TypeScript compilation and a Vite
 production build. The backend suite reports the existing Starlette/HTTPX
 deprecation warning. These tests use temporary databases and mocked model calls.
-The [code audit](architecture/CODE_AUDIT_20261103.md) records 21 reproduced
+The [fresh-clone audit](architecture/REPRODUCIBILITY_AUDIT_20261104.md) adds
+18 regression checks for new workspace paths, conflicting material context and
+offline replay of the public 120-trial benchmark archive. Dependency installation,
+the key-free browser example and real HTTP requests to both output profiles were
+checked in isolated storage, without paid model calls or the recording warehouse.
+
+The preceding 3 November baseline passed 261 backend / 60 frontend tests.
+Its [code audit](architecture/CODE_AUDIT_20261103.md) records 21 reproduced
 audit cases. Eight [JSON recovery cases](architecture/ORDER_JSON_RECOVERY.md)
 cover unreadable model responses and the exact recording prompt. Frontend
 tests retain their original assertions/time limits and run with one worker to
@@ -48,7 +55,7 @@ The actual job logs report:
 | Hosted environment | Windows, Python 3.11 and Node 22 |
 
 These historical results were read from that successful run. They describe
-the earlier source revision, not the new 3 November test totals above.
+the earlier source revision, not the new 4 November test totals above.
 
 ## Historical reports
 

@@ -58,12 +58,27 @@ def sheet_segmentation_concept(material: str, concept: str) -> str:
 def explicit_prompt_materials(text: str) -> set[str]:
     """Recognize explicit alloys and distinct families without interpreting quantities as alloys."""
     text = text.lower()
-    grades = re.findall(
+    grades = list(re.finditer(
         r"\b(?:ss\s*(?:304l?|316l?)|stainless(?: steel)?\s*(?:304l?|316l?)|"
         r"al\s*(?:6061|5052)|alumin(?:um|ium)\s*(?:6061|5052)|a36|"
         r"(?:6061|5052)(?=\s+(?:aluminum|aluminium|sheet|stock|plate)))"
-        r"(?:[-_][a-z0-9]+)?\b", text)
-    if grades:
-        return {normalize_material(g) for g in grades}
-    return {normalize_material(m.group()) for m in re.finditer(
-        r"\b(?:stainless(?: steel)?|mild steel|carbon steel|galvanized(?: steel)?|aluminum|aluminium|acrylic|brass|copper|titanium|cardboard)\b", text)}
+        r"(?:[-_][a-z0-9]+)?\b", text))
+    materials = {normalize_material(g.group()) for g in grades}
+    family_names = sorted(
+        (name for name in MATERIAL_SYNONYMS if material_identity(name)["material_grade"] is None),
+        key=lambda name: (-len(name), name),
+    )
+    family_pattern = r"\b(?:" + "|".join(re.escape(name) for name in family_names) + r")\b"
+    for family in re.finditer(family_pattern, text):
+        # A grade can contain its family name ("stainless steel 304") or
+        # precede it ("6061 aluminum", "SS304 steel"). Do not count that identity twice.
+        family_token = normalize_material(family.group())
+        family_id = material_identity(family_token)["material_family"]
+        if any(g.start() < family.end() and family.start() < g.end() or
+               (g.end() < family.start() and text[g.end():family.start()].isspace()
+                and (material_identity(g.group())["material_family"] == family_id
+                     or family_token == "steel" and material_identity(g.group())["material_family"] == "stainless_steel"))
+               for g in grades):
+            continue
+        materials.add(family_token)
+    return materials

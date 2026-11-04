@@ -1,5 +1,27 @@
 # Order interpretation comparison
 
+## Reproduce the published evidence without API keys
+
+From the repository root after installing `requirements-dev.txt`:
+
+```powershell
+.\.venv\Scripts\python.exe -m benchmarks.order_interpretation --prepare
+.\.venv\Scripts\python.exe -m benchmarks.replay_report
+```
+
+Preparation validates the 20 authored cases and two generated DXF fixtures.
+Replay reads the public `docs/architecture/benchmark-full.json.gz`, checks all
+120 case/mode/repetition records, recomputes historical correctness and summary
+statistics, and verifies the public fixture hashes and geometry. No model calls,
+private run directory or inventory writes are needed. Optional
+`--output .task-tmp/benchmark-replay.json` writes a new report and refuses to
+overwrite an existing file.
+
+This reproduces the **historical observations and scoring**, not a new measurement
+of the current parser. The production parser has changed since that experiment.
+
+## Opt-in live comparison
+
 This is an opt-in live evaluation, separate from the application. It does not
 run nesting, emit G-code, write warehouse inventory, or exercise the HTTP upload
 endpoint. Running it uses configured provider credits.
@@ -38,7 +60,7 @@ The extraction prompt, temperature 0.1, and 2,048-token limit matched the publis
 baseline when the historical comparison ran. Current parsing adds input guards
 and bounded repair. Live comparison commands now refuse a changed backend, since
 applying those guards to only one mode would make the comparison unfair. Offline
-preparation and rendering of the preserved historical run remain available.
+preparation and offline replay of the preserved historical run remain available.
 The sequential mode in that experiment retained failover and regex fallback.
 Generated part/order IDs are ignored; identical items are merged when comparing
 quantities, and unlocked rectangle/bracket rotations are equivalent. Grain locks,
@@ -70,7 +92,14 @@ The resulting architecture decision belongs in the static decision website.
 Keep observations, alternatives, chosen policy, rationale and limitations together;
 do not label a parallel agreement experiment as a deployed production feature.
 
-Render the preserved run with `python -m benchmarks.render_report <run-directory>`.
+## Maintainer-only site publishing
+
+`python -m benchmarks.render_report <run-directory>` regenerates the static
+decision site and tracked evidence files. It requires the original private
+`metadata.json`, `trials.jsonl` and pilot records, which are intentionally absent
+from a public clone. It is not the contributor verification command; use
+`benchmarks.replay_report` above. `--help` describes the required input.
+
 The readable page shows compact case tables; complete normalized provider/spec/
 usage evidence is retained in `docs/architecture/benchmark-full.json.gz`. Download
 fixtures use an equivalent minimal DXF representation, with both byte hashes

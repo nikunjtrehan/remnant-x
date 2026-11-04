@@ -6,7 +6,7 @@
     "choice": "Connect physical indexing, persistent inventory, customer orders, nesting and verified output into one workflow.",
     "alternative": "A standalone image-analysis chatbot or a repackaged winner project.",
     "reason": "The value comes from working across persistent physical and digital state, not from an impressive isolated model answer.",
-    "status": "Backend workflow implemented; physical station acceptance and frontend demonstration remain pending.",
+    "status": "The desktop now connects real SAM, pending review, accepted stock, prompt/DXF orders, batch selection, nesting and verified output. Factory process qualification remains outside the demonstrated scope.",
     "evidence": [
       "../../README.md",
       "../../backend/pipeline.py"
@@ -71,7 +71,7 @@
     "choice": "Document a flat station, matte contrasting backing, visible white-bordered markers, measured dimensions and spare marker sets.",
     "alternative": "Advertise unrestricted photographs in arbitrary environments as a reliable measurement system.",
     "reason": "The user explicitly preferred replacing an inexpensive marker over risking a badly cut part, and wanted the operating conditions visible to reviewers and operators.",
-    "status": "Station assumptions and marker visibility checks are documented/implemented. The original 60–70 degree suggestion is a proposed capture practice, not a calibrated angle measurement or a guarantee of glare removal; real-station validation is pending.",
+    "status": "The station and marker checks have been exercised on cardboard and two metal photos; the metal photos produced the expected 2 and 5 holes. Broader glare conditions have not yet been characterized. The capture SOP separates measured station dimensions from camera and lighting details that were not recorded.",
     "evidence": [
       "PHYSICAL_VALIDATION.md",
       "../../README.md"
@@ -110,7 +110,7 @@
     "choice": "Support both parametric shapes described in a prompt and uploaded DXF geometry with explicit quantities, feeding the same batch workflow.",
     "alternative": "Require CAD for every simple shape, or silently approximate a complex uploaded part with a circle or rectangle.",
     "reason": "The user repeatedly required both simple prompts and 'make 50 of this uploaded part', including mixed orders.",
-    "status": "Backend supports both paths. DXF support is deliberately bounded; arbitrary curves, blocks and 3D CAD are not accepted.",
+    "status": "Both prompt and uploaded-CAD orders use the same validated specification path. Closed planar splines and declared-unit conversion are supported within the bounded import contract; arbitrary CAD is not claimed.",
     "evidence": [
       "../../backend/api.py",
       "../../backend/tests/test_promise_acceptance.py"
@@ -201,7 +201,7 @@
     "choice": "Use pretrained segmentation, measured photographs of the actual station, and CAD parts with known dimensions. Generate simple fixtures locally where appropriate.",
     "alternative": "Train a new model or make internet photo collection a prerequisite for proving the core workflow.",
     "reason": "The user explicitly accepted self-contained phone/cardboard trials and generated part files instead of unnecessary dataset hunting.",
-    "status": "Synthetic fixtures and real SAM connectivity have been tested. The actual measured cardboard/station acceptance remains pending; generated fixtures are not represented as third-party vendor data.",
+    "status": "Two measured cardboard specimens, two metal-photo topology checks and generated CAD fixtures have been exercised. Cardboard references corrected after outputs are documented. No custom training or arbitrary industrial-CAD acceptance is claimed.",
     "evidence": [
       "PHYSICAL_VALIDATION_20261029.md",
       "../../backend/tests/test_promise_acceptance.py"
@@ -214,7 +214,7 @@
     "choice": "Provide a scanner/inventory side and a nesting/order side with sheet tabs, geometry overlays, buffers and a toolpath view.",
     "alternative": "Hide the manufacturing workflow behind conversational text and a single spinner.",
     "reason": "Users should inspect what the software inferred and planned, including where holes and parts actually are.",
-    "status": "API foundations exist; the two-sided frontend, progressive events and simulator remain planned, not completed features.",
+    "status": "Implemented desktop workbench: named batches, per-photo review/errors, stock selection, prompt/DXF orders, sheet tabs, SVG overlays and planned path playback. Playback is not a physics simulator.",
     "evidence": [
       "../../README.md",
       "../../backend/schemas.py"
@@ -227,7 +227,7 @@
     "choice": "Provide explicit demonstration inputs and separate them from real stock, along with reproducible deterministic checks and honest limits.",
     "alternative": "Require extensive setup for every first run or report cached/threshold-derived geometry as live SAM output.",
     "reason": "Demonstrations must be reproducible and distinguish live perception from synthetic inputs.",
-    "status": "Explicit demo seeding and local-threshold provenance are implemented. A polished preloaded zero-login frontend and cached-SAM replay experience remain planned.",
+    "status": "A labeled recorded 28-part example and guided walkthrough work without keys. Live photo analysis is a separate real SAM operation.",
     "evidence": [
       "../../backend/api.py",
       "../../backend/tests/test_safety_regressions.py"
@@ -253,7 +253,7 @@
     "choice": "Maintain a static record of the problem, alternatives, choice, rationale, evidence and limitations, alongside physical SOPs.",
     "alternative": "Leave rationale scattered through chats or describe only recent implementation edits.",
     "reason": "Architectural choices and physical SOPs need a reviewable record with evidence and limitations.",
-    "status": "The local static record includes founding decisions, physical validation protocol, current application audit and compact benchmark case tables, with full normalized evidence in a separate gzip download. It is not publicly deployed.",
+    "status": "Published through GitHub Pages. This record includes founding decisions, physical experiments, audits, benchmark summaries and compressed normalized evidence. The local application/API remain separate.",
     "evidence": [
       "index.html",
       "PHYSICAL_VALIDATION.md"
@@ -280,7 +280,7 @@
     "choice": "Use separately measured cardboard outlines and cutouts as validation ground truth. Process the photo using station calibration and SAM without supplying the remnant measurements to geometry extraction, then compare the inferred geometry with the physical measurements.",
     "alternative": "Treat mask consistency as physical accuracy, or require workers to measure and enter every existing boundary and hole during routine indexing.",
     "reason": "Station measurements establish metric scale; independent remnant measurements test whether perception and calibration recover the actual usable material. Production indexing should require a calibrated photo, material identity and thickness, not manually entered existing-hole dimensions.",
-    "status": "First physical capture tested on 29 October 2026. Calibrated real SAM recovered one sheet and one L-shaped hole without cleanup. User physical remeasurement corrected the hole-offset references to 73/69 mm top/left; baseline extraction is 73.46/68.65 mm without adjustment. Exterior errors still reach 4.7 mm; overall accuracy acceptance and repeatability across captures remain open. Isolated downstream orders, verified output and predicted inventory commits passed; real inventory was unchanged. Latest offline suite: 167 tests. See PHYSICAL_VALIDATION_20261029.md.",
+    "status": "The two-cardboard, eight-capture record includes independent station inputs and corrected user measurements. Five usable topologies passed; three captures were blocked. Median absolute exterior-dimension error was about 4.15 mm; 7.32 mm was the worst case. Across all 50 tabulated dimensions, spans and offsets, median absolute error was about 1.45 mm. Medians use rounded tables. No separate calibrated photo-error margin is applied beyond the selected planning clearance. Actual-size CAD validation placed one part on Piece B and two on rotated Piece A, with final programs verified. This does not certify machine accuracy.",
     "evidence": [
       "PHYSICAL_VALIDATION_20261029.md",
       "PHYSICAL_VALIDATION.md"

@@ -28,7 +28,7 @@ review, so neither is represented as source-audited.
 | Observed practice | Evidence | Remnant X application |
 | --- | --- | --- |
 | Explain the domain task before the stack | OrgLens, CrossBeam, Medkit and Gaze Link lead with a concrete user/problem | Lead with photographing offcuts and planning new parts |
-| Show inspectable proof early | OrgLens embeds a video; Elisa a UI GIF; Wrench Board a screenshot, video and viewer link | Use a screenshot from our actual recorded example and a clear local walkthrough |
+| Show inspectable proof early | OrgLens embeds a video; Elisa a UI GIF; Wrench Board a screenshot, video and viewer link | Use a screenshot from my actual recorded example and a clear local walkthrough |
 | Give the right entry point for the product | Elisa offers installers; Gaze Link links a manual; other repos give separate client/server commands | Distinguish key-free example startup from live API setup |
 | Explain why responsibilities are split | CrossBeam explains its long-job hosting; Medkit separates frontend, HTTP and voice roles | Show exactly where SAM, order interpretation and deterministic geometry operate |
 | Keep supporting evidence outside the introduction | Several repos link docs, fixtures, tests and scripts | Keep the root README concise; link the engineering reference and measured validation |
@@ -37,7 +37,7 @@ review, so neither is represented as source-audited.
 The root layouts vary considerably. Directory names, a particular framework,
 source length and a custom domain are not common requirements across the sample.
 Some repositories also publish agent instructions and development journals.
-Our public documentation records decisions and evidence; private chat transcripts
+My public documentation records decisions and evidence; private chat transcripts
 and handoff notes remain excluded.
 
 ## Did winners use purchased domains?
@@ -82,7 +82,7 @@ demo and a required custom domain remain unverified here.
 The documented baseline used instead is
 [GitHub's own README guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes):
 explain usefulness, capabilities, getting started, help and maintainership.
-Winner-source observations inform our presentation; they are not attributed to Meta.
+Winner-source observations inform my presentation; they are not attributed to Meta.
 
 ## Resulting changes
 

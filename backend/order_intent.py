@@ -102,6 +102,8 @@ def circle_diameter(context, offset, excluded):
 
 def inspect_order_prompt(prompt, uploads=()):
     text = normalize_equivalent_units(prompt.lower())
+    if len(explicit_prompt_materials(text)) > 1:
+        clarify('Specify one material/grade; the prompt and selected stock must agree.')
     if re.search(r"\beither\b.{0,100}\bor\b|\b(?:undecided|unsure)\b|\bnot\s+(?:yet\s+)?decided\b|\b(?:do not|don't)\s+know\b|\bbetween\s+\d+\s+and\s+\d+\b|\b\d+\s+or\s+\d+\b", text, re.S):
         clarify('Resolve the alternative quantities or conflicting requirements before submitting the order.')
     if re.search(rf'[-+]\s*{MEASURE}', text):

@@ -79,7 +79,7 @@ stopped. It remained a recorded example and did not substitute for a live reques
 
 Private photographs, model-response streams, experimental databases, local test
 harnesses, credentials, dependencies, build output and private handoff notes stay
-excluded. The README screenshot contains only our synthetic recorded example.
+excluded. The README screenshot contains only my synthetic recorded example.
 The matching review/plan API changes from earlier local milestones must publish
 with the frontend; publishing only the browser folder would omit required contracts.
 

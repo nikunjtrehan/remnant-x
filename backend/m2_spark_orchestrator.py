@@ -13,7 +13,7 @@ from backend.db_and_parts import (
 from backend.llm_client import LiveModelClient
 
 
-from backend.materials import MATERIAL_SYNONYMS, normalize_material, explicit_prompt_materials
+from backend.materials import MATERIAL_SYNONYMS, normalize_material, explicit_prompt_materials, material_identity
 from backend.order_intent import inspect_order_prompt, check_order_intent
 import math
 import time
@@ -614,7 +614,9 @@ class SparkWarehouseOrchestrator:
             parsed = self.validate_and_parse_order_dict(response["parsed_json"], uploaded_dxf_files=uploaded_dxf_files)
             expected = explicit_prompt_materials(raw_prompt)
             if expected and expected != {parsed.material}:
-                raise ValueError("ERR_MODEL_CHANGED_MATERIAL_GRADE")
+                if any(material_identity(material)["material_grade"] for material in expected):
+                    raise ValueError("ERR_MODEL_CHANGED_MATERIAL_GRADE")
+                raise ValueError("ERR_ORDER_NEEDS_CLARIFICATION: The interpreted material does not match the request.")
             check_order_intent(intent, parsed)
             return parsed
 

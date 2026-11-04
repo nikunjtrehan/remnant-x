@@ -77,7 +77,17 @@ For an image you supply, use `--image path.png --concept "cardboard sheet"`, opt
 
 ### Physical validation and remaining acceptance
 
-Use your real printed station and measured cardboard. Keep the sheet flat and markers visible. Capture outer dimensions and every hole with a ruler or caliper, then index the same sheet at several positions and lighting conditions. Compare extracted widths, heights, hole count, hole dimensions and boundary overlays with the measurements. Repeat the exact frames with CLAHE on and off. Record the errors and set a suitable acceptance threshold for the machine and material before claiming physical accuracy. The two-specimen experiment includes real SAM geometry and measured errors, recorded in the [physical report](architecture/PHYSICAL_VALIDATION_20261030.md). Broader materials, capture conditions and machine tolerances remain unqualified.
+Follow the [capture SOP](CAPTURE_SOP.md). Use a measured station and independently
+measured specimens. Keep the sheet flat and markers visible; record outer
+dimensions and every hole before indexing several views. Compare the extracted
+geometry with those references, including both successful and rejected captures.
+Set a process-specific acceptance threshold before claiming physical accuracy.
+The [cardboard report](architecture/PHYSICAL_VALIDATION_20261030.md) records a
+4.15 mm exterior-dimension median absolute error and 7.32 mm worst case; there
+is no separately calibrated photo-error clearance margin. Later
+[metal-photo checks](architecture/SAM_PROMPT_RECOVERY.md) detected the expected
+2 and 5 holes. Broader glare conditions have not yet been characterized, and
+actual machine tolerances and cutting processes have not been qualified.
 
 ## Material and controller boundaries
 

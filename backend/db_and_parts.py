@@ -11,6 +11,7 @@ from backend.materials import normalize_material
 from contextlib import contextmanager
 import uuid
 import threading
+from pathlib import Path
 
 
 @dataclass
@@ -54,6 +55,8 @@ class RemnantWarehouseDB:
 
     def __init__(self, db_path: str = "warehouse.db"):
         self.db_path = db_path
+        if db_path != ":memory:":
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._memory = sqlite3.connect(":memory:", check_same_thread=False) if db_path == ":memory:" else None
         self._lock = threading.RLock()
         self._init_schema()

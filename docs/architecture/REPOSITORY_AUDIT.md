@@ -17,7 +17,7 @@ does not establish a causal formula for winning.
 | CrossBeam, first place in [Anthropic's announcement](https://claude.com/resources/articles/meet-the-winners-of-our-built-with-opus-4-6-claude-code-hackathon) | [Server entry](https://github.com/mikeOnBreeze/cc-crossbeam/blob/cc5591e7e824ba5cafa9b8c6507258b996aac011/server/src/index.ts), extract/generate routes, extraction service, corrections-analysis flow and file verification utility | Thin HTTP entry points delegate work to named flows with explicit outputs. Its external services and domain research are workload-specific, not infrastructure every project should copy. |
 | Elisa, second place in the same Anthropic announcement | [Agent runner](https://github.com/zoidbergclawd/elisa/blob/10f7880a603af1e61f2737cffaeffbf6b159b620/backend/src/services/agentRunner.ts) and orchestrator at the same revision | Explicit limits, cancellation and separate planning/execution/testing phases. It is a larger system; its size is not a target for a geometry application. |
 
-The observations above are our architectural inferences from the source, not claims
+The observations above are my architectural inferences from the source, not claims
 about the judges' private reasoning. Anthropic also describes Elisa as a substantial
 AI-assisted codebase; the evidence does not support treating a line-count threshold
 or AI authorship as a disqualifier.

@@ -460,7 +460,16 @@ A production build checks TypeScript and bundles the application. Passing tests 
 
 The actual three-copy physical-photo run placed one decorative part on Piece B and two on Piece A, with both final programs verified. The offline and frontend suites check software contracts, not factory certification.
 
-Physical validation covers two cardboard specimens and eight captures: five usable topologies and three blocked captures. Exterior error reached 7.32 mm. Some ruler references were corrected after seeing outputs; preserve that fact in the evidence. Do not claim uniform millimetre accuracy or model-blind independent validation.
+Real-metal SAM checks detected the expected 2 and 5 holes in two photos; broader
+glare conditions have not yet been characterized. The separate cardboard
+experiment covers two specimens and eight captures: five usable topologies and
+three blocked captures. Median absolute exterior-dimension error is about 4.15 mm;
+7.32 mm is the worst case. Across all 50 tabulated dimensions, spans and offsets,
+median absolute error is about 1.45 mm. Medians use rounded public tables.
+Some ruler references were corrected after seeing outputs. No additional
+calibrated photo-error margin is applied beyond the selected planning clearance.
+See the [capture SOP](CAPTURE_SOP.md). Do not claim uniform millimetre accuracy
+or model-blind independent validation.
 
 The prototype does not provide automatic material identification, full lens/camera certification, reflective-metal qualification, arbitrary industrial DXF or controller support, dimensional kerf compensation, fixturing qualification, machine connectivity or physical cut sensing. It is a supervised local workflow.
 
